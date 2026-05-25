@@ -9,14 +9,14 @@ import {
   type TranscriptPayload
 } from '@shared/ipc'
 import type { SettingsSaveResult, SettingsUpdate } from '@shared/settings'
-import { createMiniWindow } from './window'
-import { createTranscriptWindow } from './transcriptWindow'
+import { createMiniWindow } from './windows/mini'
+import { createTranscriptWindow } from './windows/transcript'
 import { registerHotkey, unregisterAll } from './hotkey'
 import { createTray } from './tray'
 import { RealtimeClient } from './realtimeClient'
 import { copyAndPaste } from './paste'
 import { getApiKey, getAppSettings, getHotkey, updateSettings } from './settings'
-import { openSettingsWindow } from './settingsWindow'
+import { openSettingsWindow } from './windows/settings'
 import { LogCategory, log, logError } from './log'
 import {
   ERROR_HIDE_DELAY_MS,

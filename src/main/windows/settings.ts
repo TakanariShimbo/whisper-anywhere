@@ -1,7 +1,8 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
-import appIconPath from './assets/app-icon-256.png?asset'
-import { SETTINGS_HEIGHT, SETTINGS_WIDTH } from './constants'
+import appIconPath from '../assets/app-icon-256.png?asset'
+import { SETTINGS_HEIGHT, SETTINGS_WIDTH } from '../constants'
+import { loadEntry } from './factory'
 
 let settingsWindow: BrowserWindow | null = null
 
@@ -9,6 +10,10 @@ export interface SettingsWindowOptions {
   onClosed?: () => void
 }
 
+/**
+ * Standard framed window for configuring API key, hotkey, etc.
+ * Singleton — repeated calls focus the existing window.
+ */
 export function openSettingsWindow(options: SettingsWindowOptions = {}): BrowserWindow {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show()
@@ -42,11 +47,7 @@ export function openSettingsWindow(options: SettingsWindowOptions = {}): Browser
     options.onClosed?.()
   })
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/settings.html`)
-  } else {
-    win.loadFile(join(__dirname, '../renderer/settings.html'))
-  }
+  loadEntry(win, 'settings.html')
 
   settingsWindow = win
   return win
