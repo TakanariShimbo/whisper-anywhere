@@ -1,16 +1,23 @@
-import { app, BrowserWindow, ipcMain, Tray } from 'electron'
-import { IPC, type AppStatus, type StatusPayload } from '@shared/ipc'
+import { app, BrowserWindow, ipcMain, session, Tray } from 'electron'
+import { basename } from 'node:path'
+import {
+  IPC,
+  type AppStatus,
+  type RecordingErrorPayload,
+  type RecordingResultPayload,
+  type StatusPayload
+} from '@shared/ipc'
 import { createMiniWindow } from './window'
 import { DEFAULT_HOTKEY, registerHotkey, unregisterAll } from './hotkey'
 import { createTray } from './tray'
-import { copyAndPaste } from './paste'
+import { saveRecording } from './audio'
 
 let miniWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let currentStatus: AppStatus = 'idle'
 let busy = false
 
-const HIDE_DELAY_MS = 1000
+const HIDE_DELAY_MS = 1200
 
 function setStatus(payload: StatusPayload): void {
   currentStatus = payload.status
@@ -25,48 +32,66 @@ function setStatus(payload: StatusPayload): void {
 }
 
 /**
- * Phase 1: hotkey toggles a fake "listen → transcribe → paste" flow
- * with a fixed string. Audio + Realtime API come in later phases.
+ * Phase 2: hotkey toggles mic recording. On second press the renderer stops
+ * the mic and posts the PCM back via IPC, where we encode it as WAV and save
+ * under userData/recordings/. Phase 3 will replace the save step with a
+ * Realtime API session.
  */
-async function onHotkey(): Promise<void> {
+function onHotkey(): void {
   if (busy) return
 
-  // First press while idle → start listening.
   if (currentStatus === 'idle') {
     setStatus({ status: 'listening', text: '聞き取り中…' })
+    miniWindow?.webContents.send(IPC.RecordingStart)
     return
   }
 
-  // Second press while listening → fake transcribe → paste.
   if (currentStatus === 'listening') {
     busy = true
-    try {
-      setStatus({ status: 'transcribing', text: '文字起こし中…' })
-      await sleep(400)
-
-      const fakeText = 'WhisperAnywhere からこんにちは。'
-      setStatus({ status: 'pasting', text: fakeText })
-
-      const method = await copyAndPaste(fakeText)
-      setStatus({
-        status: 'done',
-        text: method === 'none' ? 'コピーしました（手動でペースト）' : '貼り付けました'
-      })
-
-      await sleep(HIDE_DELAY_MS)
-      setStatus({ status: 'idle' })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setStatus({ status: 'error', error: message })
-      await sleep(2500)
-      setStatus({ status: 'idle' })
-    } finally {
-      busy = false
-    }
+    setStatus({ status: 'transcribing', text: '保存中…' })
+    miniWindow?.webContents.send(IPC.RecordingStop)
+    // Wait for RecordingResult / RecordingError; busy clears in those handlers.
   }
 }
 
+async function handleRecordingResult(payload: RecordingResultPayload): Promise<void> {
+  try {
+    if (payload.pcm.byteLength === 0) {
+      setStatus({ status: 'done', text: '音声なし' })
+    } else {
+      const path = await saveRecording(payload.pcm, payload.sampleRate)
+      const seconds = (payload.durationMs / 1000).toFixed(1)
+      console.log(`[whisper-anywhere] saved ${path} (${seconds}s)`)
+      setStatus({ status: 'done', text: `保存: ${basename(path)} (${seconds}s)` })
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    setStatus({ status: 'error', error: message })
+    await sleep(2500)
+  } finally {
+    await sleep(HIDE_DELAY_MS)
+    setStatus({ status: 'idle' })
+    busy = false
+  }
+}
+
+async function handleRecordingError(payload: RecordingErrorPayload): Promise<void> {
+  setStatus({ status: 'error', error: payload.message })
+  await sleep(2500)
+  setStatus({ status: 'idle' })
+  busy = false
+}
+
 function bootstrap(): void {
+  // Auto-grant microphone / media permissions to our own renderer.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'media' || permission === 'mediaKeySystem') {
+      callback(true)
+    } else {
+      callback(false)
+    }
+  })
+
   miniWindow = createMiniWindow()
 
   // Re-send status when renderer is ready (e.g. after dev reload).
@@ -80,9 +105,7 @@ function bootstrap(): void {
     app.quit()
   })
 
-  const ok = registerHotkey(DEFAULT_HOTKEY, () => {
-    void onHotkey()
-  })
+  const ok = registerHotkey(DEFAULT_HOTKEY, onHotkey)
   if (!ok) {
     console.error(`[whisper-anywhere] hotkey 登録失敗: ${DEFAULT_HOTKEY}`)
   } else {
@@ -90,6 +113,12 @@ function bootstrap(): void {
   }
 
   ipcMain.on(IPC.RequestQuit, () => app.quit())
+  ipcMain.on(IPC.RecordingResult, (_e, payload: RecordingResultPayload) => {
+    void handleRecordingResult(payload)
+  })
+  ipcMain.on(IPC.RecordingError, (_e, payload: RecordingErrorPayload) => {
+    void handleRecordingError(payload)
+  })
 }
 
 app.whenReady().then(() => {
