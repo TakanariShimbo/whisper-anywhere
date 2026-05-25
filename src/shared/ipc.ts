@@ -3,7 +3,7 @@ export const IPC = {
   RequestQuit: 'app:quit',
   RecordingStart: 'recording:start',
   RecordingStop: 'recording:stop',
-  RecordingResult: 'recording:result',
+  RecordingChunk: 'recording:chunk',
   RecordingError: 'recording:error'
 } as const
 
@@ -22,12 +22,13 @@ export interface StatusPayload {
 }
 
 export const AUDIO_SAMPLE_RATE = 24000
+export const AUDIO_CHUNK_MS = 40
+export const AUDIO_CHUNK_SAMPLES = (AUDIO_SAMPLE_RATE * AUDIO_CHUNK_MS) / 1000 // 960
+export const AUDIO_CHUNK_BYTES = AUDIO_CHUNK_SAMPLES * 2 // 1920 bytes (int16 mono)
 
-/** Sent renderer → main when recording finishes. PCM is little-endian int16 mono. */
-export interface RecordingResultPayload {
+/** Sent renderer → main for each ~40ms PCM chunk. Little-endian int16 mono. */
+export interface RecordingChunkPayload {
   pcm: ArrayBuffer
-  sampleRate: number
-  durationMs: number
 }
 
 export interface RecordingErrorPayload {

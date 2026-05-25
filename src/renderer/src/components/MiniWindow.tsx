@@ -57,14 +57,17 @@ export function MiniWindow(): JSX.Element {
       <div
         style={{
           fontSize: 12,
-          color: 'rgba(255,255,255,0.78)',
+          lineHeight: 1.3,
+          color: 'rgba(255,255,255,0.85)',
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
+          wordBreak: 'break-word'
         }}
         title={error ?? text ?? ''}
       >
-        {error ?? text ?? ' '}
+        {error ?? text ?? ' '}
       </div>
     </div>
   )

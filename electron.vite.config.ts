@@ -6,7 +6,11 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') }
+        input: { index: resolve(__dirname, 'src/main/index.ts') },
+        // Native / Node-only deps must stay external — Vite shouldn't try to
+        // bundle them. `ws` pulls optional native modules (bufferutil,
+        // utf-8-validate) that aren't installed.
+        external: ['ws']
       }
     },
     resolve: {

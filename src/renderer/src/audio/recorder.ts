@@ -2,27 +2,24 @@ import { AUDIO_SAMPLE_RATE } from '@shared/ipc'
 
 const WORKLET_URL = '/audio-worklets/pcm-processor.js'
 
+export type ChunkCallback = (pcm: ArrayBuffer) => void
+
 /**
- * Captures microphone audio at AUDIO_SAMPLE_RATE (24kHz) as int16 mono PCM via
- * an AudioWorkletProcessor. Chunks accumulate in memory and are concatenated
- * into a single ArrayBuffer when stop() is called.
- *
- * Phase 2: buffer entire recording, send once on stop.
- * Phase 3 will stream chunks to the Realtime API instead.
+ * Streams microphone audio at AUDIO_SAMPLE_RATE (24kHz) as int16 mono PCM.
+ * The worklet emits 40ms chunks (1920 bytes each); each one is delivered
+ * straight to onChunk so callers can forward to the Realtime API in real time.
  */
 export class Recorder {
   private ctx: AudioContext | null = null
   private stream: MediaStream | null = null
   private workletNode: AudioWorkletNode | null = null
   private source: MediaStreamAudioSourceNode | null = null
-  private chunks: Int16Array[] = []
-  private startedAt = 0
 
   isRecording(): boolean {
     return this.ctx !== null
   }
 
-  async start(): Promise<void> {
+  async start(onChunk: ChunkCallback): Promise<void> {
     if (this.ctx) throw new Error('already recording')
 
     this.stream = await navigator.mediaDevices.getUserMedia({
@@ -45,19 +42,14 @@ export class Recorder {
     })
 
     this.workletNode.port.onmessage = (ev: MessageEvent<Int16Array>) => {
-      this.chunks.push(ev.data)
+      onChunk(ev.data.buffer as ArrayBuffer)
     }
 
     this.source.connect(this.workletNode)
-    this.chunks = []
-    this.startedAt = performance.now()
   }
 
-  async stop(): Promise<{ pcm: ArrayBuffer; sampleRate: number; durationMs: number }> {
-    if (!this.ctx) throw new Error('not recording')
-
-    const sampleRate = this.ctx.sampleRate
-    const durationMs = performance.now() - this.startedAt
+  async stop(): Promise<void> {
+    if (!this.ctx) return
 
     this.source?.disconnect()
     this.workletNode?.disconnect()
@@ -69,22 +61,5 @@ export class Recorder {
     this.workletNode = null
     this.stream = null
     this.ctx = null
-
-    const pcm = concatInt16(this.chunks)
-    this.chunks = []
-    return { pcm, sampleRate, durationMs }
   }
-}
-
-function concatInt16(chunks: Int16Array[]): ArrayBuffer {
-  let total = 0
-  for (const c of chunks) total += c.length
-  const buf = new ArrayBuffer(total * 2)
-  const view = new Int16Array(buf)
-  let offset = 0
-  for (const c of chunks) {
-    view.set(c, offset)
-    offset += c.length
-  }
-  return buf
 }

@@ -1,8 +1,8 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
 
-const MINI_WIDTH = 280
-const MINI_HEIGHT = 96
+const MINI_WIDTH = 320
+const MINI_HEIGHT = 140
 const MARGIN = 24
 
 export function createMiniWindow(): BrowserWindow {

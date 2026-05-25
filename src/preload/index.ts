@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import {
   IPC,
   type StatusPayload,
-  type RecordingResultPayload,
+  type RecordingChunkPayload,
   type RecordingErrorPayload
 } from '@shared/ipc'
 
@@ -23,8 +23,8 @@ const api = {
     ipcRenderer.on(IPC.RecordingStop, listener)
     return () => ipcRenderer.off(IPC.RecordingStop, listener)
   },
-  sendRecordingResult(payload: RecordingResultPayload): void {
-    ipcRenderer.send(IPC.RecordingResult, payload)
+  sendRecordingChunk(payload: RecordingChunkPayload): void {
+    ipcRenderer.send(IPC.RecordingChunk, payload)
   },
   sendRecordingError(payload: RecordingErrorPayload): void {
     ipcRenderer.send(IPC.RecordingError, payload)
