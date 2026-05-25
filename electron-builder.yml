@@ -31,6 +31,12 @@ linux:
   desktop:
     entry:
       StartupWMClass: WhisperAnywhere
+      # The deb's long `description` field is multi-line, which is invalid in
+      # a .desktop file's Comment value. Override with a single line here so
+      # GNOME / desktop-file-utils can parse the file. Localised variant for
+      # ja_* locales.
+      Comment: Voice input for any app via a global hotkey.
+      Comment[ja]: ホットキーで音声入力 → リアルタイム文字起こし → フォーカス中のアプリへ自動貼り付け。
 
 deb:
   # xdotool is required for the auto-paste step on X11.
