@@ -7,7 +7,7 @@ A desktop app that takes voice input from a global hotkey, transcribes it in rea
 Email, chat, browser, editor, Claude Code, ChatGPT — type by voice anywhere.
 
 [![Release](https://img.shields.io/github/v/release/TakanariShimbo/whisper-anywhere?include_prereleases&display_name=tag)](https://github.com/TakanariShimbo/whisper-anywhere/releases)
-[![License](https://img.shields.io/badge/license-TBD-lightgrey)](#license)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
 
@@ -467,8 +467,6 @@ Only pure logic is currently tested (status transition table). E2E (Playwright) 
 
 **Roadmap**
 
-- Post-processing modes (punctuation / Markdown / bullet list / Claude Code instruction etc.)
-- Persistent history with re-paste
 - Wayland support (`ydotool` / `wtype`)
 - macOS / Windows code signing
 - More UI languages (Chinese, Korean, etc.)
@@ -477,4 +475,4 @@ Only pure logic is currently tested (status transition table). E2E (Playwright) 
 
 ## License
 
-TBD (will likely be MIT or similar — to be decided).
+[MIT License](LICENSE) — © 2026 Takanari Shimbo

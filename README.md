@@ -7,7 +7,7 @@
 メール、チャット、ブラウザ、エディタ、Claude Code、ChatGPT — どこでも声で打てる。
 
 [![Release](https://img.shields.io/github/v/release/TakanariShimbo/whisper-anywhere?include_prereleases&display_name=tag)](https://github.com/TakanariShimbo/whisper-anywhere/releases)
-[![License](https://img.shields.io/badge/license-未定-lightgrey)](#ライセンス)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
 
@@ -467,8 +467,6 @@ npm test
 
 **ロードマップ**
 
-- 文字起こし結果の整形モード（句読点 / Markdown / 箇条書き / Claude Code 指示 など）
-- 履歴の永続化と再貼り付け
 - Wayland 対応（`ydotool` / `wtype`）
 - macOS / Windows のコード署名
 - UI 言語の追加（中国語 / 韓国語など）
@@ -477,4 +475,4 @@ npm test
 
 ## ライセンス
 
-未定（必要に応じて MIT 等を後日設定）。
+[MIT License](LICENSE) — © 2026 Takanari Shimbo
