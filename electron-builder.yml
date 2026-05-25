@@ -18,6 +18,12 @@ files:
   - "!**/node_modules/**/.bin"
 
 linux:
+  # Multi-size PNG icons under build/icons/ (16x16.png … 1024x1024.png).
+  # electron-builder installs each into /usr/share/icons/hicolor/<size>/apps/
+  # so GNOME / KDE pick the right size at every density. Without this, only
+  # the 1024 size from build/icon.png ships, and 48 / 64 / 96 fall back to
+  # the generic gear icon.
+  icon: build/icons
   target:
     - AppImage
     - deb
