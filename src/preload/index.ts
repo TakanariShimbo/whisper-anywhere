@@ -3,7 +3,8 @@ import {
   IPC,
   type StatusPayload,
   type RecordingChunkPayload,
-  type RecordingErrorPayload
+  type RecordingErrorPayload,
+  type TranscriptPayload
 } from '@shared/ipc'
 import type { AppSettings, SettingsSaveResult, SettingsUpdate } from '@shared/settings'
 
@@ -13,6 +14,12 @@ const api = {
       callback(payload)
     ipcRenderer.on(IPC.StatusUpdate, listener)
     return () => ipcRenderer.off(IPC.StatusUpdate, listener)
+  },
+  onTranscript(callback: (payload: TranscriptPayload) => void): () => void {
+    const listener = (_: Electron.IpcRendererEvent, payload: TranscriptPayload) =>
+      callback(payload)
+    ipcRenderer.on(IPC.TranscriptUpdate, listener)
+    return () => ipcRenderer.off(IPC.TranscriptUpdate, listener)
   },
   onRecordingStart(callback: () => void): () => void {
     const listener = () => callback()

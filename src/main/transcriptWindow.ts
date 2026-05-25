@@ -1,20 +1,19 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
-import appIconPath from './assets/app-icon-256.png?asset'
 
-const MINI_WIDTH = 200
-const MINI_HEIGHT = 48
-const MARGIN = 24
+const WIDTH = 600
+const HEIGHT = 160
 
-export function createMiniWindow(): BrowserWindow {
+export function createTranscriptWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay()
   const { workArea } = display
 
   const win = new BrowserWindow({
-    width: MINI_WIDTH,
-    height: MINI_HEIGHT,
-    x: workArea.x + workArea.width - MINI_WIDTH - MARGIN,
-    y: workArea.y + workArea.height - MINI_HEIGHT - MARGIN,
+    width: WIDTH,
+    height: HEIGHT,
+    // Center of the primary display's work area.
+    x: workArea.x + Math.round((workArea.width - WIDTH) / 2),
+    y: workArea.y + Math.round((workArea.height - HEIGHT) / 2),
     frame: false,
     transparent: true,
     resizable: false,
@@ -26,7 +25,6 @@ export function createMiniWindow(): BrowserWindow {
     alwaysOnTop: true,
     focusable: false, // do not steal focus from the user's app
     show: false,
-    icon: appIconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -39,9 +37,9 @@ export function createMiniWindow(): BrowserWindow {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    win.loadURL(process.env.ELECTRON_RENDERER_URL)
+    win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/transcript.html`)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/transcript.html'))
   }
 
   return win

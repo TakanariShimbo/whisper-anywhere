@@ -1,5 +1,6 @@
 export const IPC = {
   StatusUpdate: 'status:update',
+  TranscriptUpdate: 'transcript:update',
   RequestQuit: 'app:quit',
   RecordingStart: 'recording:start',
   RecordingStop: 'recording:stop',
@@ -37,4 +38,9 @@ export interface RecordingChunkPayload {
 
 export interface RecordingErrorPayload {
   message: string
+}
+
+/** Current live transcript text. Empty string means clear / hide. */
+export interface TranscriptPayload {
+  text: string
 }

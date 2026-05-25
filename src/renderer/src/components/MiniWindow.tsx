@@ -20,7 +20,7 @@ const LABEL_BY_STATUS: Record<AppStatus, string> = {
 }
 
 export function MiniWindow(): JSX.Element {
-  const { status, text, error } = useStatusStore()
+  const status = useStatusStore((s) => s.status)
   const dotColor = COLOR_BY_STATUS[status]
 
   return (
@@ -29,46 +29,29 @@ export function MiniWindow(): JSX.Element {
         width: '100%',
         height: '100%',
         boxSizing: 'border-box',
-        padding: '12px 14px',
+        padding: '10px 14px',
         background: 'rgba(20, 22, 28, 0.92)',
-        borderRadius: 14,
+        borderRadius: 12,
         border: '1px solid rgba(255,255,255,0.08)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
         display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        gap: 6
+        alignItems: 'center',
+        gap: 10
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: dotColor,
-            boxShadow: `0 0 8px ${dotColor}`
-          }}
-        />
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.4 }}>
-          {LABEL_BY_STATUS[status]}
-        </span>
-      </div>
-      <div
+      <span
         style={{
-          fontSize: 12,
-          lineHeight: 1.3,
-          color: 'rgba(255,255,255,0.85)',
-          display: '-webkit-box',
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          wordBreak: 'break-word'
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          background: dotColor,
+          boxShadow: `0 0 8px ${dotColor}`,
+          flexShrink: 0
         }}
-        title={error ?? text ?? ''}
-      >
-        {error ?? text ?? ' '}
-      </div>
+      />
+      <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.4 }}>
+        {LABEL_BY_STATUS[status]}
+      </span>
     </div>
   )
 }

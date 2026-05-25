@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhisperAnywhere Transcript</title>
+    <style>
+      html, body, #root { margin: 0; padding: 0; height: 100%; background: transparent; }
+      body {
+        font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+        color: #f5f5f5;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* Window is non-interactive (focusable:false) — auto-scroll keeps the
+         latest line visible, so hide the scrollbar entirely. */
+      *::-webkit-scrollbar { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/transcript/main.tsx"></script>
+  </body>
+</html>

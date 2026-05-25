@@ -1,13 +1,16 @@
-import { app, BrowserWindow, ipcMain, session, Tray } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, session, Tray } from 'electron'
+import appIconPath from './assets/app-icon-256.png?asset'
 import {
   IPC,
   type AppStatus,
   type RecordingChunkPayload,
   type RecordingErrorPayload,
-  type StatusPayload
+  type StatusPayload,
+  type TranscriptPayload
 } from '@shared/ipc'
 import type { SettingsSaveResult, SettingsUpdate } from '@shared/settings'
 import { createMiniWindow } from './window'
+import { createTranscriptWindow } from './transcriptWindow'
 import { registerHotkey, unregisterAll } from './hotkey'
 import { createTray } from './tray'
 import { RealtimeClient } from './realtimeClient'
@@ -17,6 +20,7 @@ import { openSettingsWindow } from './settingsWindow'
 import { log, logError } from './log'
 
 let miniWindow: BrowserWindow | null = null
+let transcriptWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let currentStatus: AppStatus = 'idle'
 let busy = false
@@ -50,6 +54,44 @@ function setStatus(payload: StatusPayload): void {
     } else if (!miniWindow.isVisible()) {
       miniWindow.showInactive() // show without stealing focus
     }
+  }
+  // Transcript window follows the same visibility rule as the indicator:
+  // visible during an active session, hidden when we're idle.
+  if (payload.status === 'idle') {
+    setTranscript('')
+  }
+  // Surface error details via a native OS notification so the user can read
+  // them at leisure — the mini window itself only shows a status label.
+  if (prev !== 'error' && payload.status === 'error' && payload.error) {
+    showErrorNotification(payload.error)
+  }
+}
+
+function setTranscript(text: string): void {
+  if (!transcriptWindow || transcriptWindow.isDestroyed()) return
+  const payload: TranscriptPayload = { text }
+  transcriptWindow.webContents.send(IPC.TranscriptUpdate, payload)
+  if (text) {
+    if (!transcriptWindow.isVisible()) transcriptWindow.showInactive()
+  } else {
+    if (transcriptWindow.isVisible()) transcriptWindow.hide()
+  }
+}
+
+function showErrorNotification(message: string): void {
+  if (!Notification.isSupported()) {
+    log('notification', `(unsupported) ${message}`)
+    return
+  }
+  try {
+    new Notification({
+      title: 'WhisperAnywhere エラー',
+      body: message,
+      icon: appIconPath,
+      urgency: 'critical' // Linux: don't auto-dismiss; user must close it
+    }).show()
+  } catch (err) {
+    logError('notification', `failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
@@ -109,6 +151,7 @@ function startSession(apiKey: string): void {
   sessionGeneration += 1
   const myGen = sessionGeneration
   lastFinalTranscript = ''
+  setTranscript('') // clear leftover text from any previous session
   log('realtime', `session#${myGen} starting`)
 
   const c = new RealtimeClient(apiKey)
@@ -121,18 +164,14 @@ function startSession(apiKey: string): void {
 
   c.on('partial', (text) => {
     if (myGen !== sessionGeneration) return
-    if (currentStatus === 'listening' || currentStatus === 'transcribing') {
-      setStatus({ status: currentStatus, text })
-    }
+    setTranscript(text)
   })
 
   c.on('final', (text) => {
     if (myGen !== sessionGeneration) return
     lastFinalTranscript = text
     log('realtime', `session#${myGen} final(${text.length} chars)`)
-    if (currentStatus === 'listening' || currentStatus === 'transcribing') {
-      setStatus({ status: currentStatus, text })
-    }
+    setTranscript(text)
   })
 
   c.on('error', (err) => {
@@ -162,20 +201,26 @@ async function finalizeSession(myGen: number): Promise<void> {
   // hotkey-stop path is harmless.
   miniWindow?.webContents.send(IPC.RecordingStop)
 
-  const transcript = lastFinalTranscript.trim()
+  // If the session already ended in error, don't overwrite the error label
+  // with 'done' / '完了' — that'd flip the indicator from red to green and
+  // hide the failure. Just keep the error state and let it time out.
+  const alreadyError = currentStatus === 'error'
 
-  if (transcript) {
-    setStatus({ status: 'pasting', text: transcript })
-    try {
-      const method = await copyAndPaste(transcript)
-      const label = method === 'none' ? `コピー: ${transcript}` : transcript
-      setStatus({ status: 'done', text: label })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setStatus({ status: 'error', error: `貼り付け失敗: ${message}` })
+  if (!alreadyError) {
+    const transcript = lastFinalTranscript.trim()
+    if (transcript) {
+      setStatus({ status: 'pasting', text: transcript })
+      try {
+        const method = await copyAndPaste(transcript)
+        const label = method === 'none' ? `コピー: ${transcript}` : transcript
+        setStatus({ status: 'done', text: label })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        setStatus({ status: 'error', error: `貼り付け失敗: ${message}` })
+      }
+    } else {
+      setStatus({ status: 'done', text: '（文字起こしなし）' })
     }
-  } else {
-    setStatus({ status: 'done', text: '（文字起こしなし）' })
   }
 
   // Paste / display is done — release the busy lock so the next hotkey press
@@ -185,9 +230,10 @@ async function finalizeSession(myGen: number): Promise<void> {
     client = null
   }
 
-  // Visual hold: keep showing the result for HIDE_DELAY_MS. If a new session
-  // starts before this fires, the generation check skips the idle reset.
-  await sleep(HIDE_DELAY_MS)
+  // Visual hold: errors get a longer hold so the user can react before the
+  // indicator hides (the notification persists separately).
+  const holdMs = currentStatus === 'error' ? 6000 : HIDE_DELAY_MS
+  await sleep(holdMs)
   if (
     myGen === sessionGeneration &&
     (currentStatus === 'done' || currentStatus === 'error')
@@ -241,6 +287,7 @@ async function bootstrap(): Promise<void> {
   })
 
   miniWindow = createMiniWindow()
+  transcriptWindow = createTranscriptWindow()
 
   miniWindow.webContents.on('did-finish-load', () => {
     miniWindow?.webContents.send(IPC.StatusUpdate, {

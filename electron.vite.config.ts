@@ -33,7 +33,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           mini: resolve(__dirname, 'src/renderer/index.html'),
-          settings: resolve(__dirname, 'src/renderer/settings.html')
+          settings: resolve(__dirname, 'src/renderer/settings.html'),
+          transcript: resolve(__dirname, 'src/renderer/transcript.html')
         }
       }
     },
