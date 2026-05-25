@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "description": "Voice input from anywhere — global hotkey, realtime transcription, paste to any app.",
+  "author": {
+    "name": "Takanari Shimbo",
+    "email": "takanari.shimbo@gmail.com"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -10,7 +14,12 @@
     "preview": "electron-vite preview",
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
     "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
-    "typecheck": "npm run typecheck:node && npm run typecheck:web"
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "pack:dir": "npm run build && electron-builder --dir",
+    "pack:linux": "npm run build && electron-builder --linux",
+    "pack:mac": "npm run build && electron-builder --mac",
+    "pack:win": "npm run build && electron-builder --win",
+    "release": "npm run build && electron-builder --publish always"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -19,14 +28,15 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.0",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "typescript": "^5.7.2",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "zustand": "^5.0.13"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "ws": "^8.21.0",
-    "zustand": "^5.0.2"
+    "ws": "^8.21.0"
   }
 }

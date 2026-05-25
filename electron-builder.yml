@@ -1,0 +1,63 @@
+appId: io.github.takanarishimbo.whisperanywhere
+productName: WhisperAnywhere
+asar: true
+
+directories:
+  output: release
+  buildResources: build
+
+# What goes into the final app bundle. electron-vite outputs to `out/`.
+# Dev dependencies are excluded automatically; runtime `dependencies` from
+# package.json (currently: ws, zustand, react, react-dom) are kept.
+files:
+  - out/**/*
+  - package.json
+  - "!**/node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}"
+  - "!**/node_modules/**/{test,__tests__,tests,powered-test,example,examples}"
+  - "!**/node_modules/**/*.d.ts"
+  - "!**/node_modules/**/.bin"
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: AudioVideo
+  maintainer: takanari.shimbo@gmail.com
+  synopsis: Voice input from any app via a global hotkey.
+  description: |
+    WhisperAnywhere lets you press a global hotkey, speak, and have
+    the transcription auto-pasted into whichever app has focus.
+  desktop:
+    StartupWMClass: WhisperAnywhere
+
+deb:
+  # xdotool is required for the auto-paste step on X11.
+  depends:
+    - xdotool
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.utilities
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  extendInfo:
+    NSMicrophoneUsageDescription: WhisperAnywhere uses your microphone to transcribe speech for hands-free text input.
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # icon.ico under build/ is picked up automatically.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+publish:
+  provider: github
+  releaseType: draft

@@ -1,4 +1,5 @@
 import { Tray, Menu, nativeImage, app } from 'electron'
+import trayIconPath from './assets/tray-mic-white-64.png?asset'
 
 export interface TrayActions {
   openSettings: () => void
@@ -6,8 +7,9 @@ export interface TrayActions {
 }
 
 export function createTray(actions: TrayActions): Tray {
-  // 1px transparent placeholder. Replace with a real icon later.
-  const icon = nativeImage.createEmpty()
+  // White mic icon; targets dark Linux trays. The 64px source is cropped tight
+  // to the artwork, so it stays visible even when the host tray downscales it.
+  const icon = nativeImage.createFromPath(trayIconPath)
   const tray = new Tray(icon)
   tray.setToolTip('WhisperAnywhere')
 

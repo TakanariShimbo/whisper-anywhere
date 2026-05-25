@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
+import appIconPath from './assets/app-icon-256.png?asset'
 
 const MINI_WIDTH = 320
 const MINI_HEIGHT = 140
@@ -25,6 +26,7 @@ export function createMiniWindow(): BrowserWindow {
     alwaysOnTop: true,
     focusable: false, // do not steal focus from the user's app
     show: false,
+    icon: appIconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

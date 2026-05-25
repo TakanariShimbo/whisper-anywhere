@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import appIconPath from './assets/app-icon-256.png?asset'
 
 let settingsWindow: BrowserWindow | null = null
 
@@ -25,6 +26,7 @@ export function openSettingsWindow(options: SettingsWindowOptions = {}): Browser
     fullscreenable: false,
     skipTaskbar: false,
     show: false,
+    icon: appIconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
