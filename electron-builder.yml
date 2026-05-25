@@ -28,7 +28,8 @@ linux:
     WhisperAnywhere lets you press a global hotkey, speak, and have
     the transcription auto-pasted into whichever app has focus.
   desktop:
-    StartupWMClass: WhisperAnywhere
+    entry:
+      StartupWMClass: WhisperAnywhere
 
 deb:
   # xdotool is required for the auto-paste step on X11.
