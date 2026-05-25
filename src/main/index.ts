@@ -6,11 +6,14 @@ import {
   type RecordingErrorPayload,
   type StatusPayload
 } from '@shared/ipc'
+import type { SettingsSaveResult, SettingsUpdate } from '@shared/settings'
 import { createMiniWindow } from './window'
-import { DEFAULT_HOTKEY, registerHotkey, unregisterAll } from './hotkey'
+import { registerHotkey, unregisterAll } from './hotkey'
 import { createTray } from './tray'
 import { RealtimeClient } from './realtimeClient'
 import { copyAndPaste } from './paste'
+import { getApiKey, getAppSettings, getHotkey, updateSettings } from './settings'
+import { openSettingsWindow } from './settingsWindow'
 
 let miniWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -20,6 +23,8 @@ let busy = false
 let client: RealtimeClient | null = null
 let sessionGeneration = 0
 let lastFinalTranscript = ''
+
+let activeHotkey = ''
 
 const HIDE_DELAY_MS = 2500
 
@@ -35,26 +40,21 @@ function setStatus(payload: StatusPayload): void {
   }
 }
 
-function getApiKey(): string | null {
-  const key = process.env.OPENAI_API_KEY?.trim()
-  return key && key.length > 0 ? key : null
-}
-
 /**
- * Phase 3: hotkey toggles a Realtime API transcription session.
- * - first press: open mic + connect WS, partial transcripts stream live
- * - second press: stop mic, commit, wait briefly for final, display it
+ * Phase 3+4: hotkey toggles a Realtime API transcription session and
+ * pastes the final transcript into whatever app has focus.
  */
-function onHotkey(): void {
+async function onHotkey(): Promise<void> {
   if (busy) return
 
   if (currentStatus === 'idle') {
-    const key = getApiKey()
+    const key = await getApiKey()
     if (!key) {
       setStatus({
         status: 'error',
-        error: 'OPENAI_API_KEY が未設定です（環境変数で渡してください）'
+        error: 'OPENAI_API_KEY が未設定です。トレイ → 設定 から登録してください'
       })
+      openSettingsWindow()
       void sleep(3000).then(() => setStatus({ status: 'idle' }))
       return
     }
@@ -120,10 +120,6 @@ function startSession(apiKey: string): void {
   c.start()
 }
 
-/**
- * Called after the WS session closes. If we captured a final transcript,
- * copy + paste it into whatever app has focus, then return to idle.
- */
 async function finalizeSession(myGen: number): Promise<void> {
   const transcript = lastFinalTranscript.trim()
 
@@ -150,7 +146,21 @@ async function finalizeSession(myGen: number): Promise<void> {
   }
 }
 
-function bootstrap(): void {
+async function applyHotkey(accelerator: string): Promise<boolean> {
+  unregisterAll()
+  const ok = registerHotkey(accelerator, () => {
+    void onHotkey()
+  })
+  if (ok) {
+    activeHotkey = accelerator
+    console.log(`[whisper-anywhere] hotkey 登録: ${accelerator}`)
+  } else {
+    console.error(`[whisper-anywhere] hotkey 登録失敗: ${accelerator}`)
+  }
+  return ok
+}
+
+async function bootstrap(): Promise<void> {
   // Auto-grant microphone permissions to our own renderer.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' || permission === 'mediaKeySystem') {
@@ -168,14 +178,13 @@ function bootstrap(): void {
     } satisfies StatusPayload)
   })
 
-  tray = createTray(() => app.quit())
+  tray = createTray({
+    openSettings: () => openSettingsWindow(),
+    quit: () => app.quit()
+  })
 
-  const ok = registerHotkey(DEFAULT_HOTKEY, onHotkey)
-  if (!ok) {
-    console.error(`[whisper-anywhere] hotkey 登録失敗: ${DEFAULT_HOTKEY}`)
-  } else {
-    console.log(`[whisper-anywhere] hotkey 登録: ${DEFAULT_HOTKEY}`)
-  }
+  const hotkey = await getHotkey()
+  await applyHotkey(hotkey)
 
   ipcMain.on(IPC.RequestQuit, () => app.quit())
   ipcMain.on(IPC.RecordingChunk, (_e, payload: RecordingChunkPayload) => {
@@ -190,13 +199,46 @@ function bootstrap(): void {
       client = null
     })
   })
+
+  ipcMain.handle(IPC.SettingsGet, async () => getAppSettings())
+  ipcMain.handle(
+    IPC.SettingsSave,
+    async (_e, update: SettingsUpdate): Promise<SettingsSaveResult> => {
+      try {
+        const previousHotkey = activeHotkey
+        const settings = await updateSettings(update)
+        if (settings.hotkey !== previousHotkey) {
+          const ok = await applyHotkey(settings.hotkey)
+          if (!ok) {
+            // Re-register the previous one so the app stays usable.
+            await applyHotkey(previousHotkey)
+            return {
+              ok: false,
+              error: `ホットキー登録失敗: ${settings.hotkey}`,
+              settings: await getAppSettings()
+            }
+          }
+        }
+        return { ok: true, settings }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        return { ok: false, error: message, settings: await getAppSettings() }
+      }
+    }
+  )
+
+  // First-launch helper: if no API key from settings or env, open the settings window.
+  const initial = await getAppSettings()
+  if (!initial.hasApiKey) {
+    openSettingsWindow()
+  }
 }
 
 app.whenReady().then(() => {
-  bootstrap()
+  void bootstrap()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) bootstrap()
+    if (BrowserWindow.getAllWindows().length === 0) void bootstrap()
   })
 })
 

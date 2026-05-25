@@ -31,7 +31,10 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     build: {
       rollupOptions: {
-        input: { mini: resolve(__dirname, 'src/renderer/index.html') }
+        input: {
+          mini: resolve(__dirname, 'src/renderer/index.html'),
+          settings: resolve(__dirname, 'src/renderer/settings.html')
+        }
       }
     },
     resolve: {

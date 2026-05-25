@@ -5,6 +5,7 @@ import {
   type RecordingChunkPayload,
   type RecordingErrorPayload
 } from '@shared/ipc'
+import type { AppSettings, SettingsSaveResult, SettingsUpdate } from '@shared/settings'
 
 const api = {
   onStatus(callback: (payload: StatusPayload) => void): () => void {
@@ -28,6 +29,12 @@ const api = {
   },
   sendRecordingError(payload: RecordingErrorPayload): void {
     ipcRenderer.send(IPC.RecordingError, payload)
+  },
+  getSettings(): Promise<AppSettings> {
+    return ipcRenderer.invoke(IPC.SettingsGet)
+  },
+  saveSettings(update: SettingsUpdate): Promise<SettingsSaveResult> {
+    return ipcRenderer.invoke(IPC.SettingsSave, update)
   },
   quit(): void {
     ipcRenderer.send(IPC.RequestQuit)

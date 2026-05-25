@@ -1,6 +1,6 @@
 import { globalShortcut } from 'electron'
 
-export const DEFAULT_HOTKEY = 'CommandOrControl+Shift+Space'
+export { DEFAULT_HOTKEY } from '@shared/settings'
 
 export function registerHotkey(accelerator: string, onTrigger: () => void): boolean {
   if (globalShortcut.isRegistered(accelerator)) {

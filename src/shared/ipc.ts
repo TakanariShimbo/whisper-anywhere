@@ -4,7 +4,9 @@ export const IPC = {
   RecordingStart: 'recording:start',
   RecordingStop: 'recording:stop',
   RecordingChunk: 'recording:chunk',
-  RecordingError: 'recording:error'
+  RecordingError: 'recording:error',
+  SettingsGet: 'settings:get',
+  SettingsSave: 'settings:save'
 } as const
 
 export type AppStatus =
