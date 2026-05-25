@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import WebSocket from 'ws'
-import { AUDIO_SAMPLE_RATE } from '@shared/ipc'
+import { AUDIO_SAMPLE_RATE } from '@shared/audio'
 import { REALTIME_COMMIT_WAIT_MS, REALTIME_PRE_BUFFER_MAX } from './constants'
 
 const REALTIME_URL = 'wss://api.openai.com/v1/realtime?intent=transcription'

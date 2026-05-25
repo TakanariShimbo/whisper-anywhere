@@ -1,5 +1,5 @@
 import { useStatusStore } from '../stores/statusStore'
-import type { AppStatus } from '@shared/ipc'
+import type { AppStatus } from '@shared/events'
 
 const COLOR_BY_STATUS: Record<AppStatus, string> = {
   idle: '#444',

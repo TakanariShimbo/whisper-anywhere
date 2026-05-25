@@ -1,13 +1,13 @@
 import { app, BrowserWindow, ipcMain, Notification, session, Tray } from 'electron'
 import appIconPath from './assets/app-icon-256.png?asset'
-import {
-  IPC,
-  type AppStatus,
-  type RecordingChunkPayload,
-  type RecordingErrorPayload,
-  type StatusPayload,
-  type TranscriptPayload
-} from '@shared/ipc'
+import { IPC } from '@shared/channels'
+import type {
+  AppStatus,
+  RecordingChunkPayload,
+  RecordingErrorPayload,
+  StatusPayload,
+  TranscriptPayload
+} from '@shared/events'
 import type { SettingsSaveResult, SettingsUpdate } from '@shared/settings'
 import { createMiniWindow } from './windows/mini'
 import { createTranscriptWindow } from './windows/transcript'

@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import {
-  IPC,
-  type StatusPayload,
-  type RecordingChunkPayload,
-  type RecordingErrorPayload,
-  type TranscriptPayload
-} from '@shared/ipc'
+import { IPC } from '@shared/channels'
+import type {
+  StatusPayload,
+  RecordingChunkPayload,
+  RecordingErrorPayload,
+  TranscriptPayload
+} from '@shared/events'
 import type { AppSettings, SettingsSaveResult, SettingsUpdate } from '@shared/settings'
 
 /**

@@ -1,4 +1,4 @@
-import { AUDIO_SAMPLE_RATE } from '@shared/ipc'
+import { AUDIO_SAMPLE_RATE } from '@shared/audio'
 
 const WORKLET_URL = '/audio-worklets/pcm-processor.js'
 

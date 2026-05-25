@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppStatus, StatusPayload } from '@shared/ipc'
+import type { AppStatus, StatusPayload } from '@shared/events'
 
 interface StatusState {
   status: AppStatus
