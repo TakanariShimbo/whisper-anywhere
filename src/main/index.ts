@@ -10,6 +10,22 @@ import { emitInitialStatus, setWindows } from './ui'
 import { createMiniWindow } from './windows/mini'
 import { createTranscriptWindow } from './windows/transcript'
 
+// Single-instance lock: if another instance is already running, exit
+// immediately. The running instance receives a 'second-instance' event and
+// can react (here: pop the settings window so the user sees something
+// happened). Must run BEFORE app.whenReady so the second instance never
+// reaches bootstrap.
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  log(LogCategory.Lifecycle, 'another instance is running — exiting')
+  app.quit()
+}
+
+app.on('second-instance', () => {
+  log(LogCategory.Lifecycle, 'second-instance launch detected — surfacing settings window')
+  showSettings()
+})
+
 let tray: Tray | null = null
 
 async function bootstrap(): Promise<void> {
