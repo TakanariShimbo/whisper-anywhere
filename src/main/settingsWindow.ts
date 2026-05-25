@@ -3,7 +3,11 @@ import { join } from 'node:path'
 
 let settingsWindow: BrowserWindow | null = null
 
-export function openSettingsWindow(): BrowserWindow {
+export interface SettingsWindowOptions {
+  onClosed?: () => void
+}
+
+export function openSettingsWindow(options: SettingsWindowOptions = {}): BrowserWindow {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show()
     settingsWindow.focus()
@@ -32,6 +36,7 @@ export function openSettingsWindow(): BrowserWindow {
   win.on('ready-to-show', () => win.show())
   win.on('closed', () => {
     settingsWindow = null
+    options.onClosed?.()
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {

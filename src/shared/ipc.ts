@@ -6,7 +6,9 @@ export const IPC = {
   RecordingChunk: 'recording:chunk',
   RecordingError: 'recording:error',
   SettingsGet: 'settings:get',
-  SettingsSave: 'settings:save'
+  SettingsSave: 'settings:save',
+  HotkeyPause: 'hotkey:pause',
+  HotkeyResume: 'hotkey:resume'
 } as const
 
 export type AppStatus =

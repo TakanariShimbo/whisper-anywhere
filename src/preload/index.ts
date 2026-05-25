@@ -36,6 +36,12 @@ const api = {
   saveSettings(update: SettingsUpdate): Promise<SettingsSaveResult> {
     return ipcRenderer.invoke(IPC.SettingsSave, update)
   },
+  pauseHotkey(): Promise<void> {
+    return ipcRenderer.invoke(IPC.HotkeyPause)
+  },
+  resumeHotkey(): Promise<void> {
+    return ipcRenderer.invoke(IPC.HotkeyResume)
+  },
   quit(): void {
     ipcRenderer.send(IPC.RequestQuit)
   }

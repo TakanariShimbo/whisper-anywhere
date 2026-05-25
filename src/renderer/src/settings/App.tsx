@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/settings'
+import { HotkeyCapture } from './HotkeyCapture'
 
-const HELP_HOTKEY =
-  'Electron アクセラレータ形式。例: CommandOrControl+Shift+Space, Alt+F12, Super+;'
+const HELP_HOTKEY = '「変更」ボタンを押してから設定したいキーの組み合わせを実際に押してください'
 
 export function App(): JSX.Element {
   const [loading, setLoading] = useState(true)
@@ -80,14 +80,7 @@ export function App(): JSX.Element {
       </Field>
 
       <Field label="ホットキー" help={HELP_HOTKEY}>
-        <input
-          type="text"
-          autoComplete="off"
-          spellCheck={false}
-          value={hotkey}
-          onChange={(e) => setHotkey(e.target.value)}
-          style={inputStyle}
-        />
+        <HotkeyCapture value={hotkey} onChange={setHotkey} />
       </Field>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

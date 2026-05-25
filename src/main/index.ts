@@ -14,6 +14,7 @@ import { RealtimeClient } from './realtimeClient'
 import { copyAndPaste } from './paste'
 import { getApiKey, getAppSettings, getHotkey, updateSettings } from './settings'
 import { openSettingsWindow } from './settingsWindow'
+import { log, logError } from './log'
 
 let miniWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -25,11 +26,23 @@ let sessionGeneration = 0
 let lastFinalTranscript = ''
 
 let activeHotkey = ''
+let hotkeyPaused = false
+let lastHotkeyAt = 0
+const HOTKEY_COOLDOWN_MS = 300
 
 const HIDE_DELAY_MS = 2500
 
 function setStatus(payload: StatusPayload): void {
+  const prev = currentStatus
   currentStatus = payload.status
+  if (prev !== payload.status) {
+    const detail = payload.error
+      ? ` error="${truncate(payload.error)}"`
+      : payload.text
+        ? ` "${truncate(payload.text)}"`
+        : ''
+    log('status', `${prev} → ${payload.status}${detail}`)
+  }
   if (miniWindow && !miniWindow.isDestroyed()) {
     miniWindow.webContents.send(IPC.StatusUpdate, payload)
     if (payload.status === 'idle') {
@@ -40,47 +53,70 @@ function setStatus(payload: StatusPayload): void {
   }
 }
 
+function truncate(s: string, n = 40): string {
+  return s.length > n ? s.slice(0, n) + '…' : s
+}
+
 /**
  * Phase 3+4: hotkey toggles a Realtime API transcription session and
  * pastes the final transcript into whatever app has focus.
  */
 async function onHotkey(): Promise<void> {
-  if (busy) return
+  const now = Date.now()
+  const sinceLast = now - lastHotkeyAt
+  // Debounce: X11 key auto-repeat / OS-level double dispatch can fire the
+  // shortcut twice for a single user press. Without this, the second fire
+  // would immediately flip listening → transcribing.
+  if (sinceLast < HOTKEY_COOLDOWN_MS) {
+    log('hotkey', `debounced (Δ=${sinceLast}ms, status=${currentStatus})`)
+    return
+  }
+  lastHotkeyAt = now
 
-  if (currentStatus === 'idle') {
-    const key = await getApiKey()
-    if (!key) {
-      setStatus({
-        status: 'error',
-        error: 'OPENAI_API_KEY が未設定です。トレイ → 設定 から登録してください'
-      })
-      openSettingsWindow()
-      void sleep(3000).then(() => setStatus({ status: 'idle' }))
-      return
-    }
-    startSession(key)
+  if (busy) {
+    log('hotkey', `ignored (busy, status=${currentStatus})`)
     return
   }
 
+  log('hotkey', `fired (status=${currentStatus})`)
+
+  // Active session → stop it.
   if (currentStatus === 'listening' || currentStatus === 'transcribing') {
     busy = true
     setStatus({ status: 'transcribing', text: '確定待ち…' })
     miniWindow?.webContents.send(IPC.RecordingStop)
     client?.stop()
+    return
   }
+
+  // idle / done / error → start a new session.
+  // (`pasting` is still busy=true, so it's caught by the guard above.)
+  const key = await getApiKey()
+  if (!key) {
+    log('hotkey', 'no API key — opening settings')
+    setStatus({
+      status: 'error',
+      error: 'OPENAI_API_KEY が未設定です。トレイ → 設定 から登録してください'
+    })
+    showSettings()
+    void sleep(3000).then(() => setStatus({ status: 'idle' }))
+    return
+  }
+  startSession(key)
 }
 
 function startSession(apiKey: string): void {
   sessionGeneration += 1
   const myGen = sessionGeneration
   lastFinalTranscript = ''
+  log('realtime', `session#${myGen} starting`)
 
   const c = new RealtimeClient(apiKey)
   client = c
 
   c.on('ready', () => {
     if (myGen !== sessionGeneration) return
-    console.log('[whisper-anywhere] realtime session ready')
+    log('realtime', `session#${myGen} ready`)
   })
 
   c.on('partial', (text) => {
@@ -93,6 +129,7 @@ function startSession(apiKey: string): void {
   c.on('final', (text) => {
     if (myGen !== sessionGeneration) return
     lastFinalTranscript = text
+    log('realtime', `session#${myGen} final(${text.length} chars)`)
     if (currentStatus === 'listening' || currentStatus === 'transcribing') {
       setStatus({ status: currentStatus, text })
     }
@@ -100,18 +137,16 @@ function startSession(apiKey: string): void {
 
   c.on('error', (err) => {
     if (myGen !== sessionGeneration) return
-    console.error('[whisper-anywhere] realtime error', err)
+    logError('realtime', `session#${myGen} error: ${err.message}`)
     setStatus({ status: 'error', error: err.message })
-    void sleep(3000).then(() => {
-      if (myGen === sessionGeneration) {
-        setStatus({ status: 'idle' })
-        busy = false
-      }
-    })
+    // Cleanup (busy=false, idle) happens via the 'closed' event → finalizeSession.
+    // ws errors normally trigger a close immediately after, so we don't need
+    // a separate timer here.
   })
 
   c.on('closed', () => {
     if (myGen !== sessionGeneration) return
+    log('realtime', `session#${myGen} closed`)
     void finalizeSession(myGen)
   })
 
@@ -132,32 +167,61 @@ async function finalizeSession(myGen: number): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setStatus({ status: 'error', error: `貼り付け失敗: ${message}` })
-      await sleep(2500)
     }
   } else {
     setStatus({ status: 'done', text: '（文字起こしなし）' })
   }
 
-  await sleep(HIDE_DELAY_MS)
+  // Paste / display is done — release the busy lock so the next hotkey press
+  // can start a new session even while we're still holding the result on-screen.
   if (myGen === sessionGeneration) {
-    setStatus({ status: 'idle' })
     busy = false
     client = null
+  }
+
+  // Visual hold: keep showing the result for HIDE_DELAY_MS. If a new session
+  // starts before this fires, the generation check skips the idle reset.
+  await sleep(HIDE_DELAY_MS)
+  if (
+    myGen === sessionGeneration &&
+    (currentStatus === 'done' || currentStatus === 'error')
+  ) {
+    setStatus({ status: 'idle' })
   }
 }
 
 async function applyHotkey(accelerator: string): Promise<boolean> {
   unregisterAll()
+  if (hotkeyPaused) {
+    // Defer actual registration; remember the desired accelerator so resume() picks it up.
+    activeHotkey = accelerator
+    log('hotkey', `deferred while paused (will register on resume): ${accelerator}`)
+    return true
+  }
   const ok = registerHotkey(accelerator, () => {
     void onHotkey()
   })
   if (ok) {
     activeHotkey = accelerator
-    console.log(`[whisper-anywhere] hotkey 登録: ${accelerator}`)
+    log('hotkey', `registered: ${accelerator}`)
   } else {
-    console.error(`[whisper-anywhere] hotkey 登録失敗: ${accelerator}`)
+    logError('hotkey', `register FAILED: ${accelerator}`)
   }
   return ok
+}
+
+/** Force-resume the global hotkey. Safe no-op if not paused. */
+async function forceResumeHotkey(): Promise<void> {
+  if (!hotkeyPaused) return
+  log('hotkey', 'force-resume (settings closed while paused)')
+  hotkeyPaused = false
+  if (activeHotkey) await applyHotkey(activeHotkey)
+}
+
+function showSettings(): void {
+  // Always force-resume on close so the renderer can't leave the global
+  // hotkey stuck in paused state (e.g. window closed mid-capture).
+  openSettingsWindow({ onClosed: () => void forceResumeHotkey() })
 }
 
 async function bootstrap(): Promise<void> {
@@ -179,7 +243,7 @@ async function bootstrap(): Promise<void> {
   })
 
   tray = createTray({
-    openSettings: () => openSettingsWindow(),
+    openSettings: () => showSettings(),
     quit: () => app.quit()
   })
 
@@ -200,10 +264,31 @@ async function bootstrap(): Promise<void> {
     })
   })
 
+  ipcMain.handle(IPC.HotkeyPause, () => {
+    log('hotkey', 'pause requested')
+    hotkeyPaused = true
+    unregisterAll()
+  })
+  ipcMain.handle(IPC.HotkeyResume, async () => {
+    log('hotkey', 'resume requested')
+    hotkeyPaused = false
+    if (activeHotkey) await applyHotkey(activeHotkey)
+  })
+
   ipcMain.handle(IPC.SettingsGet, async () => getAppSettings())
   ipcMain.handle(
     IPC.SettingsSave,
     async (_e, update: SettingsUpdate): Promise<SettingsSaveResult> => {
+      log(
+        'settings',
+        `save: ${update.hotkey ? `hotkey=${update.hotkey} ` : ''}${
+          update.apiKey === null
+            ? 'apiKey=null '
+            : update.apiKey !== undefined
+              ? 'apiKey=*** '
+              : ''
+        }`.trim() || 'save: (no changes)'
+      )
       try {
         const previousHotkey = activeHotkey
         const settings = await updateSettings(update)
@@ -222,6 +307,7 @@ async function bootstrap(): Promise<void> {
         return { ok: true, settings }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        logError('settings', `save failed: ${message}`)
         return { ok: false, error: message, settings: await getAppSettings() }
       }
     }
@@ -230,7 +316,7 @@ async function bootstrap(): Promise<void> {
   // First-launch helper: if no API key from settings or env, open the settings window.
   const initial = await getAppSettings()
   if (!initial.hasApiKey) {
-    openSettingsWindow()
+    showSettings()
   }
 }
 
