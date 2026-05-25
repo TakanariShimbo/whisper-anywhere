@@ -53,6 +53,7 @@ export function setStatus(payload: StatusPayload): void {
   // visible during an active session, hidden when we're idle.
   if (payload.status === 'idle') {
     setTranscript('')
+    hideTranscript()
   }
   // Surface error details via a native OS notification so the user can read
   // them at leisure — the mini window itself only shows a status label.
@@ -61,16 +62,26 @@ export function setStatus(payload: StatusPayload): void {
   }
 }
 
-/** Update the live transcript panel. Empty `text` hides the window. */
+/**
+ * Update the live transcript panel's text. Window visibility is controlled
+ * separately via showTranscript / hideTranscript — empty text keeps the
+ * window visible so the placeholder (rendered by the React component when
+ * text is empty) acts as the "no speech yet" state.
+ */
 export function setTranscript(text: string): void {
   if (!transcriptWindow || transcriptWindow.isDestroyed()) return
   const payload: TranscriptPayload = { text }
   transcriptWindow.webContents.send(IPC.TranscriptUpdate, payload)
-  if (text) {
-    if (!transcriptWindow.isVisible()) transcriptWindow.showInactive()
-  } else {
-    if (transcriptWindow.isVisible()) transcriptWindow.hide()
-  }
+}
+
+export function showTranscript(): void {
+  if (!transcriptWindow || transcriptWindow.isDestroyed()) return
+  if (!transcriptWindow.isVisible()) transcriptWindow.showInactive()
+}
+
+export function hideTranscript(): void {
+  if (!transcriptWindow || transcriptWindow.isDestroyed()) return
+  if (transcriptWindow.isVisible()) transcriptWindow.hide()
 }
 
 /** Show a native OS notification with critical urgency (won't auto-dismiss). */

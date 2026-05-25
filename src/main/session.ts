@@ -11,7 +11,7 @@ import { copyAndPaste } from './paste'
 import { RealtimeClient } from './realtimeClient'
 import { getApiKey } from './settings'
 import { state } from './state/appState'
-import { setStatus, setTranscript } from './ui'
+import { setStatus, setTranscript, showTranscript } from './ui'
 import { sleep } from './utils/async'
 import { openSettingsWindow } from './windows/settings'
 import type { BrowserWindow } from 'electron'
@@ -137,6 +137,7 @@ function startSession(apiKey: string): void {
   const myGen = state.nextSession()
   state.setLastFinal('')
   setTranscript('') // clear leftover text from any previous session
+  showTranscript() // surface the panel immediately so the placeholder is visible
   log(LogCategory.Realtime, `session#${myGen} starting`)
 
   const c = new RealtimeClient(apiKey)

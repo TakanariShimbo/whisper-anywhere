@@ -44,7 +44,7 @@ export function App(): JSX.Element {
           scrollbarWidth: 'none'
         }}
       >
-        {text || '…'}
+        {text || '話してください…'}
       </div>
     </div>
   )
