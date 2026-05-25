@@ -156,6 +156,12 @@ function startSession(apiKey: string): void {
 }
 
 async function finalizeSession(myGen: number): Promise<void> {
+  // Ensure the renderer-side recorder is torn down on every session end,
+  // including the error path (which never sends RecordingStop otherwise).
+  // Recorder.stop() is idempotent, so a duplicate stop from the normal
+  // hotkey-stop path is harmless.
+  miniWindow?.webContents.send(IPC.RecordingStop)
+
   const transcript = lastFinalTranscript.trim()
 
   if (transcript) {
