@@ -17,7 +17,15 @@ import { RealtimeClient } from './realtimeClient'
 import { copyAndPaste } from './paste'
 import { getApiKey, getAppSettings, getHotkey, updateSettings } from './settings'
 import { openSettingsWindow } from './settingsWindow'
-import { log, logError } from './log'
+import { LogCategory, log, logError } from './log'
+import {
+  ERROR_HIDE_DELAY_MS,
+  HIDE_DELAY_MS,
+  HOTKEY_COOLDOWN_MS,
+  TRANSIENT_ERROR_HIDE_MS
+} from './constants'
+import { sleep } from './utils/async'
+import { truncate } from './utils/string'
 
 let miniWindow: BrowserWindow | null = null
 let transcriptWindow: BrowserWindow | null = null
@@ -32,9 +40,6 @@ let lastFinalTranscript = ''
 let activeHotkey = ''
 let hotkeyPaused = false
 let lastHotkeyAt = 0
-const HOTKEY_COOLDOWN_MS = 300
-
-const HIDE_DELAY_MS = 2500
 
 function setStatus(payload: StatusPayload): void {
   const prev = currentStatus
@@ -45,7 +50,7 @@ function setStatus(payload: StatusPayload): void {
       : payload.text
         ? ` "${truncate(payload.text)}"`
         : ''
-    log('status', `${prev} → ${payload.status}${detail}`)
+    log(LogCategory.Status, `${prev} → ${payload.status}${detail}`)
   }
   if (miniWindow && !miniWindow.isDestroyed()) {
     miniWindow.webContents.send(IPC.StatusUpdate, payload)
@@ -80,7 +85,7 @@ function setTranscript(text: string): void {
 
 function showErrorNotification(message: string): void {
   if (!Notification.isSupported()) {
-    log('notification', `(unsupported) ${message}`)
+    log(LogCategory.Notification, `(unsupported) ${message}`)
     return
   }
   try {
@@ -91,12 +96,8 @@ function showErrorNotification(message: string): void {
       urgency: 'critical' // Linux: don't auto-dismiss; user must close it
     }).show()
   } catch (err) {
-    logError('notification', `failed: ${err instanceof Error ? err.message : String(err)}`)
+    logError(LogCategory.Notification, `failed: ${err instanceof Error ? err.message : String(err)}`)
   }
-}
-
-function truncate(s: string, n = 40): string {
-  return s.length > n ? s.slice(0, n) + '…' : s
 }
 
 /**
@@ -110,17 +111,17 @@ async function onHotkey(): Promise<void> {
   // shortcut twice for a single user press. Without this, the second fire
   // would immediately flip listening → transcribing.
   if (sinceLast < HOTKEY_COOLDOWN_MS) {
-    log('hotkey', `debounced (Δ=${sinceLast}ms, status=${currentStatus})`)
+    log(LogCategory.Hotkey, `debounced (Δ=${sinceLast}ms, status=${currentStatus})`)
     return
   }
   lastHotkeyAt = now
 
   if (busy) {
-    log('hotkey', `ignored (busy, status=${currentStatus})`)
+    log(LogCategory.Hotkey, `ignored (busy, status=${currentStatus})`)
     return
   }
 
-  log('hotkey', `fired (status=${currentStatus})`)
+  log(LogCategory.Hotkey, `fired (status=${currentStatus})`)
 
   // Active session → stop it.
   if (currentStatus === 'listening' || currentStatus === 'transcribing') {
@@ -135,13 +136,13 @@ async function onHotkey(): Promise<void> {
   // (`pasting` is still busy=true, so it's caught by the guard above.)
   const key = await getApiKey()
   if (!key) {
-    log('hotkey', 'no API key — opening settings')
+    log(LogCategory.Hotkey, 'no API key — opening settings')
     setStatus({
       status: 'error',
       error: 'OPENAI_API_KEY が未設定です。トレイ → 設定 から登録してください'
     })
     showSettings()
-    void sleep(3000).then(() => setStatus({ status: 'idle' }))
+    void sleep(TRANSIENT_ERROR_HIDE_MS).then(() => setStatus({ status: 'idle' }))
     return
   }
   startSession(key)
@@ -152,14 +153,14 @@ function startSession(apiKey: string): void {
   const myGen = sessionGeneration
   lastFinalTranscript = ''
   setTranscript('') // clear leftover text from any previous session
-  log('realtime', `session#${myGen} starting`)
+  log(LogCategory.Realtime, `session#${myGen} starting`)
 
   const c = new RealtimeClient(apiKey)
   client = c
 
   c.on('ready', () => {
     if (myGen !== sessionGeneration) return
-    log('realtime', `session#${myGen} ready`)
+    log(LogCategory.Realtime, `session#${myGen} ready`)
   })
 
   c.on('partial', (text) => {
@@ -170,13 +171,13 @@ function startSession(apiKey: string): void {
   c.on('final', (text) => {
     if (myGen !== sessionGeneration) return
     lastFinalTranscript = text
-    log('realtime', `session#${myGen} final(${text.length} chars)`)
+    log(LogCategory.Realtime, `session#${myGen} final(${text.length} chars)`)
     setTranscript(text)
   })
 
   c.on('error', (err) => {
     if (myGen !== sessionGeneration) return
-    logError('realtime', `session#${myGen} error: ${err.message}`)
+    logError(LogCategory.Realtime, `session#${myGen} error: ${err.message}`)
     setStatus({ status: 'error', error: err.message })
     // Cleanup (busy=false, idle) happens via the 'closed' event → finalizeSession.
     // ws errors normally trigger a close immediately after, so we don't need
@@ -185,7 +186,7 @@ function startSession(apiKey: string): void {
 
   c.on('closed', () => {
     if (myGen !== sessionGeneration) return
-    log('realtime', `session#${myGen} closed`)
+    log(LogCategory.Realtime, `session#${myGen} closed`)
     void finalizeSession(myGen)
   })
 
@@ -232,7 +233,7 @@ async function finalizeSession(myGen: number): Promise<void> {
 
   // Visual hold: errors get a longer hold so the user can react before the
   // indicator hides (the notification persists separately).
-  const holdMs = currentStatus === 'error' ? 6000 : HIDE_DELAY_MS
+  const holdMs = currentStatus === 'error' ? ERROR_HIDE_DELAY_MS : HIDE_DELAY_MS
   await sleep(holdMs)
   if (
     myGen === sessionGeneration &&
@@ -247,7 +248,7 @@ async function applyHotkey(accelerator: string): Promise<boolean> {
   if (hotkeyPaused) {
     // Defer actual registration; remember the desired accelerator so resume() picks it up.
     activeHotkey = accelerator
-    log('hotkey', `deferred while paused (will register on resume): ${accelerator}`)
+    log(LogCategory.Hotkey, `deferred while paused (will register on resume): ${accelerator}`)
     return true
   }
   const ok = registerHotkey(accelerator, () => {
@@ -255,9 +256,9 @@ async function applyHotkey(accelerator: string): Promise<boolean> {
   })
   if (ok) {
     activeHotkey = accelerator
-    log('hotkey', `registered: ${accelerator}`)
+    log(LogCategory.Hotkey, `registered: ${accelerator}`)
   } else {
-    logError('hotkey', `register FAILED: ${accelerator}`)
+    logError(LogCategory.Hotkey, `register FAILED: ${accelerator}`)
   }
   return ok
 }
@@ -265,7 +266,7 @@ async function applyHotkey(accelerator: string): Promise<boolean> {
 /** Force-resume the global hotkey. Safe no-op if not paused. */
 async function forceResumeHotkey(): Promise<void> {
   if (!hotkeyPaused) return
-  log('hotkey', 'force-resume (settings closed while paused)')
+  log(LogCategory.Hotkey, 'force-resume (settings closed while paused)')
   hotkeyPaused = false
   if (activeHotkey) await applyHotkey(activeHotkey)
 }
@@ -310,7 +311,7 @@ async function bootstrap(): Promise<void> {
   ipcMain.on(IPC.RecordingError, (_e, payload: RecordingErrorPayload) => {
     setStatus({ status: 'error', error: payload.message })
     client?.close()
-    void sleep(3000).then(() => {
+    void sleep(TRANSIENT_ERROR_HIDE_MS).then(() => {
       setStatus({ status: 'idle' })
       busy = false
       client = null
@@ -318,12 +319,12 @@ async function bootstrap(): Promise<void> {
   })
 
   ipcMain.handle(IPC.HotkeyPause, () => {
-    log('hotkey', 'pause requested')
+    log(LogCategory.Hotkey, 'pause requested')
     hotkeyPaused = true
     unregisterAll()
   })
   ipcMain.handle(IPC.HotkeyResume, async () => {
-    log('hotkey', 'resume requested')
+    log(LogCategory.Hotkey, 'resume requested')
     hotkeyPaused = false
     if (activeHotkey) await applyHotkey(activeHotkey)
   })
@@ -333,7 +334,7 @@ async function bootstrap(): Promise<void> {
     IPC.SettingsSave,
     async (_e, update: SettingsUpdate): Promise<SettingsSaveResult> => {
       log(
-        'settings',
+        LogCategory.Settings,
         `save: ${update.hotkey ? `hotkey=${update.hotkey} ` : ''}${
           update.apiKey === null
             ? 'apiKey=null '
@@ -360,7 +361,7 @@ async function bootstrap(): Promise<void> {
         return { ok: true, settings }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        logError('settings', `save failed: ${message}`)
+        logError(LogCategory.Settings, `save failed: ${message}`)
         return { ok: false, error: message, settings: await getAppSettings() }
       }
     }
@@ -393,7 +394,3 @@ app.on('will-quit', () => {
   tray?.destroy()
   tray = null
 })
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
-}

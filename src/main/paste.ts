@@ -1,6 +1,7 @@
 import { clipboard } from 'electron'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
+import { sleep } from './utils/async'
 
 const execAsync = promisify(exec)
 
@@ -45,8 +46,4 @@ export async function copyAndPaste(text: string): Promise<PasteMethod> {
   }
 
   return 'none'
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
 }

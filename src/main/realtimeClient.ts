@@ -1,11 +1,10 @@
 import { EventEmitter } from 'node:events'
 import WebSocket from 'ws'
 import { AUDIO_SAMPLE_RATE } from '@shared/ipc'
+import { REALTIME_COMMIT_WAIT_MS, REALTIME_PRE_BUFFER_MAX } from './constants'
 
 const REALTIME_URL = 'wss://api.openai.com/v1/realtime?intent=transcription'
 const MODEL = 'gpt-realtime-whisper'
-const PRE_BUFFER_MAX = 250 // ~10s at 40ms/chunk
-const COMMIT_WAIT_MS = 4000 // grace period after stop() for final transcript
 
 interface RealtimeEvents {
   ready: () => void
@@ -26,7 +25,7 @@ export interface RealtimeClient {
  * One-shot transcription session against OpenAI Realtime API. Lifecycle:
  *   start() → connect → onSessionReady → send audio → stop() → close
  *
- * Audio is buffered until the session is ready (up to PRE_BUFFER_MAX chunks),
+ * Audio is buffered until the session is ready (up to REALTIME_PRE_BUFFER_MAX chunks),
  * then flushed. Concatenates all `.completed` transcripts into the final result.
  */
 export class RealtimeClient extends EventEmitter {
@@ -64,7 +63,7 @@ export class RealtimeClient extends EventEmitter {
     if (this.closed || this.stopping) return
     const b64 = Buffer.from(pcm).toString('base64')
     if (!this.ready) {
-      if (this.preBuffer.length < PRE_BUFFER_MAX) {
+      if (this.preBuffer.length < REALTIME_PRE_BUFFER_MAX) {
         this.preBuffer.push(b64)
       }
       return
@@ -80,7 +79,7 @@ export class RealtimeClient extends EventEmitter {
       this.flushPreBuffer()
       this.sendJson({ type: 'input_audio_buffer.commit' })
     }
-    this.commitTimer = setTimeout(() => this.close(), COMMIT_WAIT_MS)
+    this.commitTimer = setTimeout(() => this.close(), REALTIME_COMMIT_WAIT_MS)
   }
 
   close(): void {

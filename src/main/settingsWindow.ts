@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import appIconPath from './assets/app-icon-256.png?asset'
+import { SETTINGS_HEIGHT, SETTINGS_WIDTH } from './constants'
 
 let settingsWindow: BrowserWindow | null = null
 
@@ -16,8 +17,8 @@ export function openSettingsWindow(options: SettingsWindowOptions = {}): Browser
   }
 
   const win = new BrowserWindow({
-    width: 520,
-    height: 420,
+    width: SETTINGS_WIDTH,
+    height: SETTINGS_HEIGHT,
     title: 'WhisperAnywhere 設定',
     autoHideMenuBar: true,
     resizable: true,

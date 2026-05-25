@@ -1,8 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
-
-const WIDTH = 600
-const HEIGHT = 160
+import { TRANSCRIPT_HEIGHT as HEIGHT, TRANSCRIPT_WIDTH as WIDTH } from './constants'
 
 export function createTranscriptWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay()

@@ -1,10 +1,7 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
 import appIconPath from './assets/app-icon-256.png?asset'
-
-const MINI_WIDTH = 200
-const MINI_HEIGHT = 48
-const MARGIN = 24
+import { MINI_HEIGHT, MINI_WIDTH, OVERLAY_MARGIN } from './constants'
 
 export function createMiniWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay()
@@ -13,8 +10,8 @@ export function createMiniWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: MINI_WIDTH,
     height: MINI_HEIGHT,
-    x: workArea.x + workArea.width - MINI_WIDTH - MARGIN,
-    y: workArea.y + workArea.height - MINI_HEIGHT - MARGIN,
+    x: workArea.x + workArea.width - MINI_WIDTH - OVERLAY_MARGIN,
+    y: workArea.y + workArea.height - MINI_HEIGHT - OVERLAY_MARGIN,
     frame: false,
     transparent: true,
     resizable: false,
