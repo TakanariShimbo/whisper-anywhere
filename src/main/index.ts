@@ -10,6 +10,7 @@ import { createMiniWindow } from './window'
 import { DEFAULT_HOTKEY, registerHotkey, unregisterAll } from './hotkey'
 import { createTray } from './tray'
 import { RealtimeClient } from './realtimeClient'
+import { copyAndPaste } from './paste'
 
 let miniWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -111,23 +112,42 @@ function startSession(apiKey: string): void {
 
   c.on('closed', () => {
     if (myGen !== sessionGeneration) return
-    if (lastFinalTranscript) {
-      setStatus({ status: 'done', text: lastFinalTranscript })
-    } else {
-      setStatus({ status: 'done', text: '（文字起こしなし）' })
-    }
-    void sleep(HIDE_DELAY_MS).then(() => {
-      if (myGen === sessionGeneration) {
-        setStatus({ status: 'idle' })
-        busy = false
-        client = null
-      }
-    })
+    void finalizeSession(myGen)
   })
 
   setStatus({ status: 'listening', text: '聞き取り中…' })
   miniWindow?.webContents.send(IPC.RecordingStart)
   c.start()
+}
+
+/**
+ * Called after the WS session closes. If we captured a final transcript,
+ * copy + paste it into whatever app has focus, then return to idle.
+ */
+async function finalizeSession(myGen: number): Promise<void> {
+  const transcript = lastFinalTranscript.trim()
+
+  if (transcript) {
+    setStatus({ status: 'pasting', text: transcript })
+    try {
+      const method = await copyAndPaste(transcript)
+      const label = method === 'none' ? `コピー: ${transcript}` : transcript
+      setStatus({ status: 'done', text: label })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setStatus({ status: 'error', error: `貼り付け失敗: ${message}` })
+      await sleep(2500)
+    }
+  } else {
+    setStatus({ status: 'done', text: '（文字起こしなし）' })
+  }
+
+  await sleep(HIDE_DELAY_MS)
+  if (myGen === sessionGeneration) {
+    setStatus({ status: 'idle' })
+    busy = false
+    client = null
+  }
 }
 
 function bootstrap(): void {
