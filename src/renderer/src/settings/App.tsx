@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AppSettings } from '@shared/settings'
+import { LANGUAGE_OPTIONS, type AppSettings, type LanguageCode } from '@shared/settings'
 import { HotkeyCapture } from './HotkeyCapture'
 
 const HELP_HOTKEY = '「変更」ボタンを押してから設定したいキーの組み合わせを実際に押してください'
@@ -11,6 +11,7 @@ export function App(): JSX.Element {
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [autoStart, setAutoStart] = useState(false)
   const [autoStartSupported, setAutoStartSupported] = useState(false)
+  const [language, setLanguage] = useState<LanguageCode>('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
@@ -27,12 +28,16 @@ export function App(): JSX.Element {
     setHasApiKey(s.hasApiKey)
     setAutoStart(s.autoStart)
     setAutoStartSupported(s.autoStartSupported)
+    setLanguage(s.language)
   }
 
   async function onSave(): Promise<void> {
     setSaving(true)
     setMessage(null)
-    const update: { hotkey?: string; apiKey?: string | null } = { hotkey }
+    const update: { hotkey?: string; apiKey?: string | null; language?: LanguageCode } = {
+      hotkey,
+      language
+    }
     if (apiKeyInput.trim()) update.apiKey = apiKeyInput.trim()
     const res = await window.whisper.saveSettings(update)
     setSaving(false)
@@ -101,6 +106,23 @@ export function App(): JSX.Element {
 
       <Field label="ホットキー" help={HELP_HOTKEY}>
         <HotkeyCapture value={hotkey} onChange={setHotkey} />
+      </Field>
+
+      <Field
+        label="言語"
+        help="文字起こしの言語ヒント。Auto はモデルに自動判定させます。明示すると精度・速度が上がります（他言語も認識は継続）"
+      >
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value as LanguageCode)}
+          style={selectStyle}
+        >
+          {LANGUAGE_OPTIONS.map((opt) => (
+            <option key={opt.code} value={opt.code}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </Field>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -197,6 +219,18 @@ const inputStyle: React.CSSProperties = {
   padding: '8px 10px',
   fontSize: 13,
   outline: 'none'
+}
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  appearance: 'none',
+  paddingRight: 32,
+  cursor: 'pointer',
+  backgroundImage:
+    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23999' stroke-width='1.5'><path d='M1 1l5 5 5-5'/></svg>\")",
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  backgroundSize: '10px'
 }
 
 const primaryButtonStyle: React.CSSProperties = {

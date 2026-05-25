@@ -55,8 +55,9 @@ export function registerIpcHandlers(): void {
             : update.apiKey !== undefined
               ? 'apiKey=*** '
               : ''
-        }${update.autoStart !== undefined ? `autoStart=${update.autoStart} ` : ''}`.trim() ||
-          'save: (no changes)'
+        }${update.autoStart !== undefined ? `autoStart=${update.autoStart} ` : ''}${
+          update.language !== undefined ? `language=${update.language || 'auto'} ` : ''
+        }`.trim() || 'save: (no changes)'
       )
       try {
         const previousHotkey = state.hotkeyAccel

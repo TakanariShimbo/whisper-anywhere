@@ -1,7 +1,15 @@
 import { app, safeStorage } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DEFAULT_HOTKEY, type AppSettings, type SettingsUpdate } from '@shared/settings'
+import {
+  DEFAULT_HOTKEY,
+  LANGUAGE_OPTIONS,
+  type AppSettings,
+  type LanguageCode,
+  type SettingsUpdate
+} from '@shared/settings'
+
+const VALID_LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code))
 
 /**
  * On-disk schema. The API key is stored encrypted when OS keychain access is
@@ -13,6 +21,8 @@ interface DiskSettings {
   apiKey?: string // plaintext fallback when safeStorage is unavailable
   /** ISO timestamp of the first successful launch; absence means we've never launched before. */
   firstLaunchAt?: string
+  /** ISO-639-1 transcription language hint. '' or missing = auto-detect. */
+  language?: string
 }
 
 const FILE_NAME = 'settings.json'
@@ -65,12 +75,19 @@ export async function getHotkey(): Promise<string> {
   return data.hotkey?.trim() || DEFAULT_HOTKEY
 }
 
+/** Returns the persisted language hint, defaulting to '' (auto-detect). */
+export async function getLanguage(): Promise<LanguageCode> {
+  const data = await loadFromDisk()
+  const v = data.language ?? ''
+  return VALID_LANGUAGES.has(v) ? (v as LanguageCode) : ''
+}
+
 /**
- * Returns just the persistence-managed slice of AppSettings (hotkey +
- * hasApiKey). OS-level flags like autoStart live in services/autoStart.ts
+ * Returns the persistence-managed slice of AppSettings (hotkey, hasApiKey,
+ * language). OS-level flags like autoStart live in services/autoStart.ts
  * and are merged in by the IPC layer.
  */
-export type PersistedSettings = Pick<AppSettings, 'hotkey' | 'hasApiKey'>
+export type PersistedSettings = Pick<AppSettings, 'hotkey' | 'hasApiKey' | 'language'>
 
 export async function getAppSettings(): Promise<PersistedSettings> {
   const data = await loadFromDisk()
@@ -78,7 +95,8 @@ export async function getAppSettings(): Promise<PersistedSettings> {
   const hasFromEnv = Boolean(process.env.OPENAI_API_KEY?.trim())
   return {
     hotkey: data.hotkey?.trim() || DEFAULT_HOTKEY,
-    hasApiKey: hasFromFile || hasFromEnv
+    hasApiKey: hasFromFile || hasFromEnv,
+    language: await getLanguage()
   }
 }
 
@@ -115,6 +133,14 @@ export async function updateSettings(update: SettingsUpdate): Promise<PersistedS
       console.warn('[whisper-anywhere] safeStorage 不可、API key を平文保存します')
       data.apiKey = update.apiKey
       delete data.apiKeyEnc
+    }
+  }
+
+  if (update.language !== undefined) {
+    if (update.language && VALID_LANGUAGES.has(update.language)) {
+      data.language = update.language
+    } else {
+      delete data.language // empty string / unknown code → auto-detect
     }
   }
 

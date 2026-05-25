@@ -38,7 +38,10 @@ export class RealtimeClient extends EventEmitter {
   private stopping = false
   private commitTimer: NodeJS.Timeout | null = null
 
-  constructor(private readonly apiKey: string) {
+  constructor(
+    private readonly apiKey: string,
+    private readonly language: string = ''
+  ) {
     super()
   }
 
@@ -101,6 +104,12 @@ export class RealtimeClient extends EventEmitter {
   }
 
   private handleOpen(): void {
+    // language is an optional ISO-639-1 hint. The Realtime API treats it as
+    // a hint (not a hard filter) — supplying it improves accuracy + latency
+    // for the expected language without blocking other languages entirely.
+    const transcription: Record<string, string> = { model: MODEL }
+    if (this.language) transcription.language = this.language
+
     this.sendJson({
       type: 'session.update',
       session: {
@@ -108,7 +117,7 @@ export class RealtimeClient extends EventEmitter {
         audio: {
           input: {
             format: { type: 'audio/pcm', rate: AUDIO_SAMPLE_RATE },
-            transcription: { model: MODEL }
+            transcription
           }
         }
       }

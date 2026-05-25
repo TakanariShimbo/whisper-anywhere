@@ -9,7 +9,7 @@ import { registerHotkey, unregisterAll } from './hotkey'
 import { LogCategory, log, logError } from './log'
 import { copyAndPaste } from './paste'
 import { RealtimeClient } from './realtimeClient'
-import { getApiKey } from './settings'
+import { getApiKey, getLanguage } from './settings'
 import { state } from './state/appState'
 import { setStatus, setTranscript, showTranscript } from './ui'
 import { sleep } from './utils/async'
@@ -130,17 +130,20 @@ async function onHotkey(): Promise<void> {
     void sleep(TRANSIENT_ERROR_HIDE_MS).then(() => setStatus({ status: 'idle' }))
     return
   }
-  startSession(key)
+  void startSession(key)
 }
 
-function startSession(apiKey: string): void {
+async function startSession(apiKey: string): Promise<void> {
   const myGen = state.nextSession()
   state.setLastFinal('')
   setTranscript('') // clear leftover text from any previous session
   showTranscript() // surface the panel immediately so the placeholder is visible
-  log(LogCategory.Realtime, `session#${myGen} starting`)
 
-  const c = new RealtimeClient(apiKey)
+  // language hint is optional; '' means let the API auto-detect.
+  const language = await getLanguage()
+  log(LogCategory.Realtime, `session#${myGen} starting (lang=${language || 'auto'})`)
+
+  const c = new RealtimeClient(apiKey, language)
   state.setClient(c)
 
   c.on('ready', () => {
