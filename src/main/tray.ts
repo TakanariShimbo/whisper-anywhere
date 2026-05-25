@@ -1,10 +1,28 @@
 import { Tray, Menu, nativeImage, app } from 'electron'
 import trayIconPath from './assets/tray-mic-white-64.png?asset'
+import { t } from './i18n'
 
 export interface TrayActions {
   openSettings: () => void
   restart: () => void
   quit: () => void
+}
+
+/**
+ * Build (or rebuild) the tray context menu using the current UI language.
+ * Pass an existing Tray to refresh it in-place after the language changes —
+ * the icon and tooltip object are reused; only the menu template is rebuilt.
+ */
+export function applyTrayMenu(tray: Tray, actions: TrayActions): void {
+  const menu = Menu.buildFromTemplate([
+    { label: `WhisperAnywhere v${app.getVersion()}`, enabled: false },
+    { type: 'separator' },
+    { label: t('tray.openSettings'), click: actions.openSettings },
+    { label: t('tray.restart'), click: actions.restart },
+    { type: 'separator' },
+    { label: t('tray.quit'), click: actions.quit }
+  ])
+  tray.setContextMenu(menu)
 }
 
 export function createTray(actions: TrayActions): Tray {
@@ -13,15 +31,6 @@ export function createTray(actions: TrayActions): Tray {
   const icon = nativeImage.createFromPath(trayIconPath)
   const tray = new Tray(icon)
   tray.setToolTip('WhisperAnywhere')
-
-  const menu = Menu.buildFromTemplate([
-    { label: `WhisperAnywhere v${app.getVersion()}`, enabled: false },
-    { type: 'separator' },
-    { label: '設定…', click: actions.openSettings },
-    { label: '再起動', click: actions.restart },
-    { type: 'separator' },
-    { label: '終了', click: actions.quit }
-  ])
-  tray.setContextMenu(menu)
+  applyTrayMenu(tray, actions)
   return tray
 }

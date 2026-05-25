@@ -7,6 +7,7 @@ import type {
   TranscriptPayload
 } from '@shared/events'
 import type { AppSettings, SettingsSaveResult, SettingsUpdate } from '@shared/settings'
+import type { UILanguage } from '@shared/i18n'
 
 /**
  * Subscribe to a main → renderer IPC event. The optional Payload type
@@ -27,6 +28,7 @@ const api = {
   onTranscript: (cb: (p: TranscriptPayload) => void) => on<TranscriptPayload>(IPC.TranscriptUpdate, cb),
   onRecordingStart: (cb: () => void) => on(IPC.RecordingStart, cb),
   onRecordingStop: (cb: () => void) => on(IPC.RecordingStop, cb),
+  onUILanguageChanged: (cb: (lang: UILanguage) => void) => on<UILanguage>(IPC.SettingsChanged, cb),
 
   sendRecordingChunk: (payload: RecordingChunkPayload): void =>
     ipcRenderer.send(IPC.RecordingChunk, payload),

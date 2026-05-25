@@ -2,6 +2,7 @@ import { BrowserWindow, Notification } from 'electron'
 import appIconPath from './assets/app-icon-256.png?asset'
 import { IPC } from '@shared/channels'
 import type { StatusPayload, TranscriptPayload } from '@shared/events'
+import { t } from './i18n'
 import { LogCategory, log, logError } from './log'
 import { state } from './state/appState'
 import { isAllowedTransition } from './state/transitions'
@@ -92,7 +93,7 @@ export function showErrorNotification(message: string): void {
   }
   try {
     new Notification({
-      title: 'WhisperAnywhere エラー',
+      title: t('notification.errorTitle'),
       body: message,
       icon: appIconPath,
       urgency: 'critical'

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '../shared/i18n'
 
 interface Props {
   value: string
@@ -97,6 +98,7 @@ function mapCode(code: string, key: string): string | null {
 }
 
 export function HotkeyCapture({ value, onChange }: Props): JSX.Element {
+  const { t } = useI18n()
   const [recording, setRecording] = useState(false)
   const [preview, setPreview] = useState('')
 
@@ -162,15 +164,17 @@ export function HotkeyCapture({ value, onChange }: Props): JSX.Element {
           letterSpacing: 0.2
         }}
       >
-        {recording ? (preview || 'キーを押してください…（Esc で取消）') : value || '未設定'}
+        {recording
+          ? preview || t('settings.field.hotkey.prompt')
+          : value || t('settings.field.hotkey.empty')}
       </div>
       {recording ? (
         <button type="button" onClick={() => void stopRecording()} style={cancelButtonStyle}>
-          取消
+          {t('settings.field.hotkey.cancelButton')}
         </button>
       ) : (
         <button type="button" onClick={() => void startRecording()} style={recordButtonStyle}>
-          変更
+          {t('settings.field.hotkey.recordButton')}
         </button>
       )}
     </>

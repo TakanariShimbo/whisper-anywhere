@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useI18n } from '../shared/i18n'
 
 export function App(): JSX.Element {
   const [text, setText] = useState('')
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
 
   useEffect(() => {
     return window.whisper.onTranscript(({ text }) => setText(text))
@@ -39,12 +41,10 @@ export function App(): JSX.Element {
           color: text ? '#f5f5f5' : 'rgba(255,255,255,0.4)',
           wordBreak: 'break-word',
           textAlign: 'left',
-          // Hide the scrollbar — the window is non-interactive (focusable:false)
-          // and the auto-scroll keeps the latest content in view.
           scrollbarWidth: 'none'
         }}
       >
-        {text || '話してください…'}
+        {text || t('transcript.placeholder')}
       </div>
     </div>
   )

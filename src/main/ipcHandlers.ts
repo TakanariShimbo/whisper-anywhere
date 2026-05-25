@@ -5,6 +5,8 @@ import type {
   RecordingErrorPayload
 } from '@shared/events'
 import type { SettingsSaveResult, SettingsUpdate } from '@shared/settings'
+import type { UILanguage } from '@shared/i18n'
+import { t } from './i18n'
 import { LogCategory, log, logError } from './log'
 import {
   applyHotkey,
@@ -22,6 +24,11 @@ async function getCombinedSettings() {
   return { ...base, autoStart: auto.enabled, autoStartSupported: auto.supported }
 }
 
+export interface IpcDeps {
+  /** Called after every settings save that may have changed the UI language. */
+  onUILanguageChanged: (lang: UILanguage) => void
+}
+
 /**
  * One-stop registration of every IPC handler. Called once at bootstrap.
  *
@@ -29,7 +36,7 @@ async function getCombinedSettings() {
  * src/shared/events.ts. Handlers delegate to the relevant feature module
  * (session, settings, ui) — this file is mostly a wiring sheet.
  */
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(deps: IpcDeps): void {
   ipcMain.on(IPC.RequestQuit, () => app.quit())
 
   ipcMain.on(IPC.RecordingChunk, (_e, payload: RecordingChunkPayload) => {
@@ -70,13 +77,16 @@ export function registerIpcHandlers(): void {
             await applyHotkey(previousHotkey)
             return {
               ok: false,
-              error: `ホットキー登録失敗: ${settings.hotkey}`,
+              error: t('error.hotkeyRegisterFailed', { hotkey: settings.hotkey }),
               settings: await getCombinedSettings()
             }
           }
         }
         if (update.autoStart !== undefined) {
           await applyAutoStart(update.autoStart)
+        }
+        if (update.uiLanguage !== undefined) {
+          deps.onUILanguageChanged(settings.uiLanguage)
         }
         return { ok: true, settings: await getCombinedSettings() }
       } catch (err) {

@@ -8,6 +8,8 @@ export interface AppSettings {
   autoStartSupported: boolean
   /** ISO-639-1 code passed to the Realtime API as a transcription hint. Empty string = auto-detect. */
   language: LanguageCode
+  /** Language used by WhisperAnywhere's own UI (settings, indicator labels, tray menu, notifications). */
+  uiLanguage: 'ja' | 'en'
 }
 
 /** Updates sent renderer → main. Each field is optional; only present keys are written. */
@@ -19,6 +21,8 @@ export interface SettingsUpdate {
   autoStart?: boolean
   /** ISO-639-1 transcription language hint. '' means auto-detect. */
   language?: LanguageCode
+  /** Toggle the app's UI language. */
+  uiLanguage?: 'ja' | 'en'
 }
 
 /**

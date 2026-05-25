@@ -1,6 +1,7 @@
 import { app, safeStorage } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { detectUILanguage, type UILanguage } from '@shared/i18n'
 import {
   DEFAULT_HOTKEY,
   LANGUAGE_OPTIONS,
@@ -10,6 +11,7 @@ import {
 } from '@shared/settings'
 
 const VALID_LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code))
+const VALID_UI_LANGUAGES: ReadonlySet<UILanguage> = new Set(['ja', 'en'])
 
 /**
  * On-disk schema. The API key is stored encrypted when OS keychain access is
@@ -23,6 +25,8 @@ interface DiskSettings {
   firstLaunchAt?: string
   /** ISO-639-1 transcription language hint. '' or missing = auto-detect. */
   language?: string
+  /** UI language ('ja' or 'en'). Missing = derive from OS locale. */
+  uiLanguage?: string
 }
 
 const FILE_NAME = 'settings.json'
@@ -82,12 +86,23 @@ export async function getLanguage(): Promise<LanguageCode> {
   return VALID_LANGUAGES.has(v) ? (v as LanguageCode) : ''
 }
 
+/** Returns the persisted UI language, defaulting to OS locale (ja or en). */
+export async function getUILanguage(): Promise<UILanguage> {
+  const data = await loadFromDisk()
+  const stored = data.uiLanguage as UILanguage | undefined
+  if (stored && VALID_UI_LANGUAGES.has(stored)) return stored
+  return detectUILanguage(app.getLocale())
+}
+
 /**
  * Returns the persistence-managed slice of AppSettings (hotkey, hasApiKey,
- * language). OS-level flags like autoStart live in services/autoStart.ts
- * and are merged in by the IPC layer.
+ * language, uiLanguage). OS-level flags like autoStart live in
+ * services/autoStart.ts and are merged in by the IPC layer.
  */
-export type PersistedSettings = Pick<AppSettings, 'hotkey' | 'hasApiKey' | 'language'>
+export type PersistedSettings = Pick<
+  AppSettings,
+  'hotkey' | 'hasApiKey' | 'language' | 'uiLanguage'
+>
 
 export async function getAppSettings(): Promise<PersistedSettings> {
   const data = await loadFromDisk()
@@ -96,7 +111,8 @@ export async function getAppSettings(): Promise<PersistedSettings> {
   return {
     hotkey: data.hotkey?.trim() || DEFAULT_HOTKEY,
     hasApiKey: hasFromFile || hasFromEnv,
-    language: await getLanguage()
+    language: await getLanguage(),
+    uiLanguage: await getUILanguage()
   }
 }
 
@@ -142,6 +158,10 @@ export async function updateSettings(update: SettingsUpdate): Promise<PersistedS
     } else {
       delete data.language // empty string / unknown code → auto-detect
     }
+  }
+
+  if (update.uiLanguage !== undefined && VALID_UI_LANGUAGES.has(update.uiLanguage)) {
+    data.uiLanguage = update.uiLanguage
   }
 
   await persist(data)

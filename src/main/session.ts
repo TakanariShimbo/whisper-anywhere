@@ -6,6 +6,7 @@ import {
   TRANSIENT_ERROR_HIDE_MS
 } from './constants'
 import { registerHotkey, unregisterAll } from './hotkey'
+import { t } from './i18n'
 import { LogCategory, log, logError } from './log'
 import { copyAndPaste } from './paste'
 import { RealtimeClient } from './realtimeClient'
@@ -113,7 +114,7 @@ async function onHotkey(): Promise<void> {
 
   if (state.status === 'listening' || state.status === 'transcribing') {
     state.setBusy(true)
-    setStatus({ status: 'transcribing', text: '確定待ち…' })
+    setStatus({ status: 'transcribing', text: t('status.text.finalizing') })
     miniWindow?.webContents.send(IPC.RecordingStop)
     state.client?.stop()
     return
@@ -124,7 +125,7 @@ async function onHotkey(): Promise<void> {
     log(LogCategory.Hotkey, 'no API key — opening settings')
     setStatus({
       status: 'error',
-      error: 'OPENAI_API_KEY が未設定です。トレイ → 設定 から登録してください'
+      error: t('error.noApiKey')
     })
     showSettings()
     void sleep(TRANSIENT_ERROR_HIDE_MS).then(() => setStatus({ status: 'idle' }))
@@ -176,7 +177,7 @@ async function startSession(apiKey: string): Promise<void> {
     void finalizeSession(myGen)
   })
 
-  setStatus({ status: 'listening', text: '聞き取り中…' })
+  setStatus({ status: 'listening', text: t('status.text.listening') })
   miniWindow?.webContents.send(IPC.RecordingStart)
   c.start()
 }
@@ -197,14 +198,15 @@ async function finalizeSession(myGen: number): Promise<void> {
       setStatus({ status: 'pasting', text: transcript })
       try {
         const method = await copyAndPaste(transcript)
-        const label = method === 'none' ? `コピー: ${transcript}` : transcript
+        const label =
+          method === 'none' ? t('status.text.copyOnly', { text: transcript }) : transcript
         setStatus({ status: 'done', text: label })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        setStatus({ status: 'error', error: `貼り付け失敗: ${message}` })
+        setStatus({ status: 'error', error: t('error.pasteFailed', { message }) })
       }
     } else {
-      setStatus({ status: 'done', text: '（文字起こしなし）' })
+      setStatus({ status: 'done', text: t('status.text.noTranscript') })
     }
   }
 

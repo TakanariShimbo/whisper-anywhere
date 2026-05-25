@@ -1,4 +1,5 @@
 import { useStatusStore } from '../stores/statusStore'
+import { useI18n } from '../shared/i18n'
 import type { AppStatus } from '@shared/events'
 
 const COLOR_BY_STATUS: Record<AppStatus, string> = {
@@ -10,17 +11,18 @@ const COLOR_BY_STATUS: Record<AppStatus, string> = {
   error: '#c0392b'
 }
 
-const LABEL_BY_STATUS: Record<AppStatus, string> = {
-  idle: '待機中',
-  listening: '聞き取り中',
-  transcribing: '文字起こし中',
-  pasting: '貼り付け中',
-  done: '完了',
-  error: 'エラー'
+const STATUS_KEY: Record<AppStatus, Parameters<ReturnType<typeof useI18n>['t']>[0]> = {
+  idle: 'status.idle',
+  listening: 'status.listening',
+  transcribing: 'status.transcribing',
+  pasting: 'status.pasting',
+  done: 'status.done',
+  error: 'status.error'
 }
 
 export function MiniWindow(): JSX.Element {
   const status = useStatusStore((s) => s.status)
+  const { t } = useI18n()
   const dotColor = COLOR_BY_STATUS[status]
 
   return (
@@ -50,7 +52,7 @@ export function MiniWindow(): JSX.Element {
         }}
       />
       <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.4 }}>
-        {LABEL_BY_STATUS[status]}
+        {t(STATUS_KEY[status])}
       </span>
     </div>
   )

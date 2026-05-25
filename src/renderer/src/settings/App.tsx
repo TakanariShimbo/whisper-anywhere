@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { LANGUAGE_OPTIONS, type AppSettings, type LanguageCode } from '@shared/settings'
+import type { UILanguage } from '@shared/i18n'
+import { useI18n } from '../shared/i18n'
 import { HotkeyCapture } from './HotkeyCapture'
 
-const HELP_HOTKEY = '「変更」ボタンを押してから設定したいキーの組み合わせを実際に押してください'
-
 export function App(): JSX.Element {
+  const { t } = useI18n()
   const [loading, setLoading] = useState(true)
   const [hotkey, setHotkey] = useState('')
   const [hasApiKey, setHasApiKey] = useState(false)
@@ -12,6 +13,7 @@ export function App(): JSX.Element {
   const [autoStart, setAutoStart] = useState(false)
   const [autoStartSupported, setAutoStartSupported] = useState(false)
   const [language, setLanguage] = useState<LanguageCode>('')
+  const [uiLanguage, setUILanguage] = useState<UILanguage>('ja')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
@@ -29,24 +31,26 @@ export function App(): JSX.Element {
     setAutoStart(s.autoStart)
     setAutoStartSupported(s.autoStartSupported)
     setLanguage(s.language)
+    setUILanguage(s.uiLanguage)
   }
 
   async function onSave(): Promise<void> {
     setSaving(true)
     setMessage(null)
-    const update: { hotkey?: string; apiKey?: string | null; language?: LanguageCode } = {
-      hotkey,
-      language
-    }
+    const update: {
+      hotkey?: string
+      apiKey?: string | null
+      language?: LanguageCode
+    } = { hotkey, language }
     if (apiKeyInput.trim()) update.apiKey = apiKeyInput.trim()
     const res = await window.whisper.saveSettings(update)
     setSaving(false)
     if (res.ok) {
       applySettings(res.settings)
       setApiKeyInput('')
-      setMessage({ kind: 'ok', text: '保存しました' })
+      setMessage({ kind: 'ok', text: t('settings.saved') })
     } else {
-      setMessage({ kind: 'err', text: res.error ?? '保存に失敗しました' })
+      setMessage({ kind: 'err', text: res.error ?? t('settings.saveFailed') })
     }
   }
 
@@ -57,36 +61,52 @@ export function App(): JSX.Element {
     setSaving(false)
     if (res.ok) {
       applySettings(res.settings)
-      setMessage({ kind: 'ok', text: 'API キーを削除しました' })
+      setMessage({ kind: 'ok', text: t('settings.keyCleared') })
     } else {
-      setMessage({ kind: 'err', text: res.error ?? '削除に失敗しました' })
+      setMessage({ kind: 'err', text: res.error ?? t('settings.clearFailed') })
     }
   }
 
-  // Save autoStart on toggle (no separate "保存" needed for a single boolean).
+  // Save autoStart / uiLanguage on toggle (no separate "Save" needed).
   async function onToggleAutoStart(next: boolean): Promise<void> {
-    setAutoStart(next) // optimistic
+    setAutoStart(next)
     setMessage(null)
     const res = await window.whisper.saveSettings({ autoStart: next })
     if (res.ok) {
       applySettings(res.settings)
     } else {
-      applySettings(res.settings) // revert
-      setMessage({ kind: 'err', text: res.error ?? '自動起動の設定に失敗しました' })
+      applySettings(res.settings)
+      setMessage({ kind: 'err', text: res.error ?? t('settings.autoStartFailed') })
+    }
+  }
+
+  async function onChangeUILanguage(next: UILanguage): Promise<void> {
+    setUILanguage(next)
+    setMessage(null)
+    const res = await window.whisper.saveSettings({ uiLanguage: next })
+    if (res.ok) {
+      applySettings(res.settings)
+    } else {
+      applySettings(res.settings)
+      setMessage({ kind: 'err', text: res.error ?? t('settings.saveFailed') })
     }
   }
 
   if (loading) {
-    return <div style={{ padding: 24 }}>読み込み中…</div>
+    return <div style={{ padding: 24 }}>{t('settings.loading')}</div>
   }
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>WhisperAnywhere 設定</h1>
+      <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('settings.title')}</h1>
 
       <Field
-        label="OpenAI API キー"
-        help={hasApiKey ? '設定済み（空欄のまま保存すれば変更なし）' : '未設定'}
+        label={t('settings.field.apiKey')}
+        help={
+          hasApiKey
+            ? t('settings.field.apiKey.help.set')
+            : t('settings.field.apiKey.help.unset')
+        }
       >
         <input
           type="password"
@@ -94,23 +114,27 @@ export function App(): JSX.Element {
           spellCheck={false}
           value={apiKeyInput}
           onChange={(e) => setApiKeyInput(e.target.value)}
-          placeholder={hasApiKey ? '••••••••（変更時のみ入力）' : 'sk-…'}
+          placeholder={
+            hasApiKey
+              ? t('settings.field.apiKey.placeholder.set')
+              : t('settings.field.apiKey.placeholder.unset')
+          }
           style={inputStyle}
         />
         {hasApiKey && (
           <button type="button" onClick={onClearKey} disabled={saving} style={linkButtonStyle}>
-            キーを削除
+            {t('settings.field.apiKey.clearButton')}
           </button>
         )}
       </Field>
 
-      <Field label="ホットキー" help={HELP_HOTKEY}>
+      <Field label={t('settings.field.hotkey')} help={t('settings.field.hotkey.help')}>
         <HotkeyCapture value={hotkey} onChange={setHotkey} />
       </Field>
 
       <Field
-        label="言語"
-        help="文字起こしの言語ヒント。Auto はモデルに自動判定させます。明示すると精度・速度が上がります（他言語も認識は継続）"
+        label={t('settings.field.language')}
+        help={t('settings.field.language.help')}
       >
         <select
           value={language}
@@ -119,7 +143,7 @@ export function App(): JSX.Element {
         >
           {LANGUAGE_OPTIONS.map((opt) => (
             <option key={opt.code} value={opt.code}>
-              {opt.label}
+              {opt.code === '' ? t('settings.field.language.auto') : opt.label}
             </option>
           ))}
         </select>
@@ -127,7 +151,7 @@ export function App(): JSX.Element {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button type="button" onClick={onSave} disabled={saving} style={primaryButtonStyle}>
-          {saving ? '保存中…' : '保存'}
+          {saving ? t('settings.saving') : t('settings.saveButton')}
         </button>
         {message && (
           <span style={{ fontSize: 13, color: message.kind === 'ok' ? '#7ee787' : '#ff8080' }}>
@@ -138,12 +162,23 @@ export function App(): JSX.Element {
 
       <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
 
+      <Field label={t('settings.field.uiLanguage')} help={t('settings.field.uiLanguage.help')}>
+        <select
+          value={uiLanguage}
+          onChange={(e) => void onChangeUILanguage(e.target.value as UILanguage)}
+          style={selectStyle}
+        >
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+      </Field>
+
       <CheckboxField
-        label="ログイン時に起動"
+        label={t('settings.field.autoStart')}
         help={
           autoStartSupported
-            ? 'OS にサインインしたとき自動で WhisperAnywhere を立ち上げます'
-            : '開発モードでは無効（インストール版でのみ動作）'
+            ? t('settings.field.autoStart.help.supported')
+            : t('settings.field.autoStart.help.unsupported')
         }
         checked={autoStart}
         disabled={!autoStartSupported}
@@ -204,7 +239,9 @@ function CheckboxField({
         {label}
       </span>
       {help && (
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingLeft: 24 }}>{help}</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingLeft: 24 }}>
+          {help}
+        </span>
       )}
     </label>
   )

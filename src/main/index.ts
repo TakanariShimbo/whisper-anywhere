@@ -1,12 +1,21 @@
 import { app, BrowserWindow, session, Tray } from 'electron'
+import { IPC } from '@shared/channels'
+import type { UILanguage } from '@shared/i18n'
 import { registerIpcHandlers } from './ipcHandlers'
 import { LogCategory, log } from './log'
 import { unregisterAll } from './hotkey'
 import { applyHotkey, setMiniWindow, showSettings } from './session'
 import { applyAutoStart } from './services/autoStart'
-import { getAppSettings, getHotkey, isFirstLaunch, markFirstLaunchComplete } from './settings'
+import {
+  getAppSettings,
+  getHotkey,
+  getUILanguage,
+  isFirstLaunch,
+  markFirstLaunchComplete
+} from './settings'
+import { setCurrentUILanguage } from './i18n'
 import { state } from './state/appState'
-import { createTray } from './tray'
+import { applyTrayMenu, createTray, type TrayActions } from './tray'
 import { emitInitialStatus, setWindows } from './ui'
 import { createMiniWindow } from './windows/mini'
 import { createTranscriptWindow } from './windows/transcript'
@@ -32,6 +41,10 @@ let tray: Tray | null = null
 async function bootstrap(): Promise<void> {
   log(LogCategory.Lifecycle, 'bootstrap')
 
+  // Initialise the UI language as early as possible so tray menu / status
+  // strings come out correctly on first paint.
+  setCurrentUILanguage(await getUILanguage())
+
   // Auto-grant microphone permissions to our own renderer.
   // Newer Chromium (Electron 32+) runs a synchronous permission CHECK before
   // dispatching the (async) permission REQUEST, so both handlers must allow
@@ -53,7 +66,7 @@ async function bootstrap(): Promise<void> {
 
   miniWindow.webContents.on('did-finish-load', emitInitialStatus)
 
-  tray = createTray({
+  const trayActions: TrayActions = {
     openSettings: showSettings,
     restart: () => {
       log(LogCategory.Lifecycle, 'restart requested')
@@ -61,12 +74,23 @@ async function bootstrap(): Promise<void> {
       app.quit()
     },
     quit: () => app.quit()
-  })
+  }
+  tray = createTray(trayActions)
 
   const hotkey = await getHotkey()
   await applyHotkey(hotkey)
 
-  registerIpcHandlers()
+  registerIpcHandlers({
+    onUILanguageChanged: (lang: UILanguage) => {
+      setCurrentUILanguage(lang)
+      // Rebuild the tray menu so it picks up the new translations.
+      if (tray) applyTrayMenu(tray, trayActions)
+      // Broadcast to every renderer so live windows reflow without a restart.
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send(IPC.SettingsChanged, lang)
+      }
+    }
+  })
 
   // First-launch defaults: enable launch-at-login by default (matching the
   // "tray-resident" mental model of the app). Only on packaged builds —

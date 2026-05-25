@@ -13,6 +13,8 @@ export const IPC = {
   // main → renderer (recorder lifecycle)
   RecordingStart: 'recording:start',
   RecordingStop: 'recording:stop',
+  // main → renderer (broadcast when settings save changes anything UI-visible)
+  SettingsChanged: 'settings:changed',
 
   // renderer → main
   RequestQuit: 'app:quit',
