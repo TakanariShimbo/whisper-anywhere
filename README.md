@@ -6,6 +6,12 @@
 
 メール、チャット、ブラウザ、エディタ、Claude Code、ChatGPT — どこでも声で打てる。
 
+<p align="center">
+  <img src="docs/hero.gif" alt="WhisperAnywhere demo" width="720" />
+</p>
+
+<p align="center"><em>ChatGPT のプロンプト欄に音声で入力する例。ホットキー押下 → 中央パネルにリアルタイム文字起こし → 確定で ChatGPT の入力欄へ自動貼り付け。</em></p>
+
 [![Release](https://img.shields.io/github/v/release/TakanariShimbo/whisper-anywhere?include_prereleases&display_name=tag)](https://github.com/TakanariShimbo/whisper-anywhere/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 

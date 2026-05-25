@@ -6,6 +6,12 @@ A desktop app that takes voice input from a global hotkey, transcribes it in rea
 
 Email, chat, browser, editor, Claude Code, ChatGPT — type by voice anywhere.
 
+<p align="center">
+  <img src="docs/hero.gif" alt="WhisperAnywhere demo" width="720" />
+</p>
+
+<p align="center"><em>Dictating a prompt into ChatGPT: press the hotkey, the live transcript appears in the centre panel, and the final text auto-pastes into ChatGPT's input.</em></p>
+
 [![Release](https://img.shields.io/github/v/release/TakanariShimbo/whisper-anywhere?include_prereleases&display_name=tag)](https://github.com/TakanariShimbo/whisper-anywhere/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
