@@ -51,6 +51,11 @@ async function bootstrap(): Promise<void> {
 
   tray = createTray({
     openSettings: showSettings,
+    restart: () => {
+      log(LogCategory.Lifecycle, 'restart requested')
+      app.relaunch()
+      app.quit()
+    },
     quit: () => app.quit()
   })
 

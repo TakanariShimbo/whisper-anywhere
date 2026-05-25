@@ -3,6 +3,7 @@ import trayIconPath from './assets/tray-mic-white-64.png?asset'
 
 export interface TrayActions {
   openSettings: () => void
+  restart: () => void
   quit: () => void
 }
 
@@ -17,6 +18,7 @@ export function createTray(actions: TrayActions): Tray {
     { label: `WhisperAnywhere v${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     { label: '設定…', click: actions.openSettings },
+    { label: '再起動', click: actions.restart },
     { type: 'separator' },
     { label: '終了', click: actions.quit }
   ])
