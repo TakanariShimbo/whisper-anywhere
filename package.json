@@ -15,6 +15,8 @@
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
     "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "pack:dir": "npm run build && electron-builder --dir",
     "pack:linux": "npm run build && electron-builder --linux",
     "pack:mac": "npm run build && electron-builder --mac",
@@ -34,6 +36,7 @@
     "react-dom": "^19.2.6",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
+    "vitest": "^4.1.7",
     "zustand": "^5.0.13"
   },
   "dependencies": {
