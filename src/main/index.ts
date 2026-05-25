@@ -3,7 +3,8 @@ import { registerIpcHandlers } from './ipcHandlers'
 import { LogCategory, log } from './log'
 import { unregisterAll } from './hotkey'
 import { applyHotkey, setMiniWindow, showSettings } from './session'
-import { getAppSettings, getHotkey } from './settings'
+import { applyAutoStart } from './services/autoStart'
+import { getAppSettings, getHotkey, isFirstLaunch, markFirstLaunchComplete } from './settings'
 import { state } from './state/appState'
 import { createTray } from './tray'
 import { emitInitialStatus, setWindows } from './ui'
@@ -64,10 +65,21 @@ async function bootstrap(): Promise<void> {
 
   registerIpcHandlers()
 
+  // First-launch defaults: enable launch-at-login by default (matching the
+  // "tray-resident" mental model of the app). Only on packaged builds —
+  // applyAutoStart no-ops in dev anyway, but skipping the marker file write
+  // in dev means a packaged install on the same machine still gets the
+  // first-launch experience.
+  if (app.isPackaged && (await isFirstLaunch())) {
+    log(LogCategory.Lifecycle, 'first launch — enabling autoStart by default')
+    await applyAutoStart(true)
+    await markFirstLaunchComplete()
+  }
+
   // First-launch helper: if no API key from settings or env, open settings.
   const initial = await getAppSettings()
   if (!initial.hasApiKey) {
-    log(LogCategory.Lifecycle, 'no API key on first launch — opening settings')
+    log(LogCategory.Lifecycle, 'no API key — opening settings')
     showSettings()
   }
 }

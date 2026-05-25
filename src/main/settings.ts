@@ -11,6 +11,8 @@ interface DiskSettings {
   hotkey?: string
   apiKeyEnc?: string // base64-encoded encrypted bytes
   apiKey?: string // plaintext fallback when safeStorage is unavailable
+  /** ISO timestamp of the first successful launch; absence means we've never launched before. */
+  firstLaunchAt?: string
 }
 
 const FILE_NAME = 'settings.json'
@@ -78,6 +80,20 @@ export async function getAppSettings(): Promise<PersistedSettings> {
     hotkey: data.hotkey?.trim() || DEFAULT_HOTKEY,
     hasApiKey: hasFromFile || hasFromEnv
   }
+}
+
+/** True if no prior launch has been recorded on disk. */
+export async function isFirstLaunch(): Promise<boolean> {
+  const data = await loadFromDisk()
+  return !data.firstLaunchAt
+}
+
+/** Stamp the settings file so isFirstLaunch() returns false next time. No-op if already stamped. */
+export async function markFirstLaunchComplete(): Promise<void> {
+  const data = { ...(await loadFromDisk()) }
+  if (data.firstLaunchAt) return
+  data.firstLaunchAt = new Date().toISOString()
+  await persist(data)
 }
 
 /** Applies a partial update. Returns the new persisted settings. */
