@@ -31,6 +31,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # electron-builder uses package.json's `version` to name the release and
+      # its artifacts, so we sync it to whatever tag triggered the workflow.
+      # This way contributors only need to push `git tag vX.Y.Z` — no manual
+      # package.json bump required.
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "Setting package.json version to $VERSION"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
       - name: Build (electron-vite)
         run: npm run build
 

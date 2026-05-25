@@ -66,17 +66,17 @@ npm run pack:win     # .exe (NSIS)（Windows でのみ実行可推奨）
 
 ### リリース手順
 
-1. `package.json` の `version` を上げる
-2. main にコミット
-3. タグを打って push
+1. タグを打って push:
 
    ```bash
    git tag v0.1.0
    git push origin v0.1.0
    ```
 
-4. GitHub Actions が ubuntu / macOS / windows ランナーで並行ビルド → **draft** リリースに各成果物を自動アップロード
-5. GitHub の Releases 画面で内容を確認して publish
+2. GitHub Actions が tag から version を抽出 → `package.json` を同期 → ubuntu / macOS / windows で並行ビルド → **draft** リリースに各成果物を自動アップロード
+3. GitHub の Releases 画面で内容を確認して publish
+
+> `package.json` の `version` を手動で bump する必要はありません。タグから自動で同期されます。
 
 ## アーキテクチャ
 
