@@ -2,7 +2,6 @@ import { app, BrowserWindow, ipcMain, Notification, session, Tray } from 'electr
 import appIconPath from './assets/app-icon-256.png?asset'
 import { IPC } from '@shared/channels'
 import type {
-  AppStatus,
   RecordingChunkPayload,
   RecordingErrorPayload,
   StatusPayload,
@@ -26,24 +25,17 @@ import {
 } from './constants'
 import { sleep } from './utils/async'
 import { truncate } from './utils/string'
+import { state } from './state/appState'
 
+// Window handles + tray live here (not in AppState) because they're
+// infrastructure created once at bootstrap, not state that drives behaviour.
 let miniWindow: BrowserWindow | null = null
 let transcriptWindow: BrowserWindow | null = null
 let tray: Tray | null = null
-let currentStatus: AppStatus = 'idle'
-let busy = false
-
-let client: RealtimeClient | null = null
-let sessionGeneration = 0
-let lastFinalTranscript = ''
-
-let activeHotkey = ''
-let hotkeyPaused = false
-let lastHotkeyAt = 0
 
 function setStatus(payload: StatusPayload): void {
-  const prev = currentStatus
-  currentStatus = payload.status
+  const prev = state.status
+  state.setStatus(payload.status)
   if (prev !== payload.status) {
     const detail = payload.error
       ? ` error="${truncate(payload.error)}"`
@@ -96,7 +88,10 @@ function showErrorNotification(message: string): void {
       urgency: 'critical' // Linux: don't auto-dismiss; user must close it
     }).show()
   } catch (err) {
-    logError(LogCategory.Notification, `failed: ${err instanceof Error ? err.message : String(err)}`)
+    logError(
+      LogCategory.Notification,
+      `failed: ${err instanceof Error ? err.message : String(err)}`
+    )
   }
 }
 
@@ -105,30 +100,29 @@ function showErrorNotification(message: string): void {
  * pastes the final transcript into whatever app has focus.
  */
 async function onHotkey(): Promise<void> {
-  const now = Date.now()
-  const sinceLast = now - lastHotkeyAt
   // Debounce: X11 key auto-repeat / OS-level double dispatch can fire the
   // shortcut twice for a single user press. Without this, the second fire
   // would immediately flip listening → transcribing.
+  const sinceLast = state.msSinceHotkeyFired()
   if (sinceLast < HOTKEY_COOLDOWN_MS) {
-    log(LogCategory.Hotkey, `debounced (Δ=${sinceLast}ms, status=${currentStatus})`)
+    log(LogCategory.Hotkey, `debounced (Δ=${sinceLast}ms, status=${state.status})`)
     return
   }
-  lastHotkeyAt = now
+  state.markHotkeyFired()
 
-  if (busy) {
-    log(LogCategory.Hotkey, `ignored (busy, status=${currentStatus})`)
+  if (state.busy) {
+    log(LogCategory.Hotkey, `ignored (busy, status=${state.status})`)
     return
   }
 
-  log(LogCategory.Hotkey, `fired (status=${currentStatus})`)
+  log(LogCategory.Hotkey, `fired (status=${state.status})`)
 
   // Active session → stop it.
-  if (currentStatus === 'listening' || currentStatus === 'transcribing') {
-    busy = true
+  if (state.status === 'listening' || state.status === 'transcribing') {
+    state.setBusy(true)
     setStatus({ status: 'transcribing', text: '確定待ち…' })
     miniWindow?.webContents.send(IPC.RecordingStop)
-    client?.stop()
+    state.client?.stop()
     return
   }
 
@@ -149,34 +143,33 @@ async function onHotkey(): Promise<void> {
 }
 
 function startSession(apiKey: string): void {
-  sessionGeneration += 1
-  const myGen = sessionGeneration
-  lastFinalTranscript = ''
+  const myGen = state.nextSession()
+  state.setLastFinal('')
   setTranscript('') // clear leftover text from any previous session
   log(LogCategory.Realtime, `session#${myGen} starting`)
 
   const c = new RealtimeClient(apiKey)
-  client = c
+  state.setClient(c)
 
   c.on('ready', () => {
-    if (myGen !== sessionGeneration) return
+    if (myGen !== state.sessionGen) return
     log(LogCategory.Realtime, `session#${myGen} ready`)
   })
 
   c.on('partial', (text) => {
-    if (myGen !== sessionGeneration) return
+    if (myGen !== state.sessionGen) return
     setTranscript(text)
   })
 
   c.on('final', (text) => {
-    if (myGen !== sessionGeneration) return
-    lastFinalTranscript = text
+    if (myGen !== state.sessionGen) return
+    state.setLastFinal(text)
     log(LogCategory.Realtime, `session#${myGen} final(${text.length} chars)`)
     setTranscript(text)
   })
 
   c.on('error', (err) => {
-    if (myGen !== sessionGeneration) return
+    if (myGen !== state.sessionGen) return
     logError(LogCategory.Realtime, `session#${myGen} error: ${err.message}`)
     setStatus({ status: 'error', error: err.message })
     // Cleanup (busy=false, idle) happens via the 'closed' event → finalizeSession.
@@ -185,7 +178,7 @@ function startSession(apiKey: string): void {
   })
 
   c.on('closed', () => {
-    if (myGen !== sessionGeneration) return
+    if (myGen !== state.sessionGen) return
     log(LogCategory.Realtime, `session#${myGen} closed`)
     void finalizeSession(myGen)
   })
@@ -205,10 +198,10 @@ async function finalizeSession(myGen: number): Promise<void> {
   // If the session already ended in error, don't overwrite the error label
   // with 'done' / '完了' — that'd flip the indicator from red to green and
   // hide the failure. Just keep the error state and let it time out.
-  const alreadyError = currentStatus === 'error'
+  const alreadyError = state.status === 'error'
 
   if (!alreadyError) {
-    const transcript = lastFinalTranscript.trim()
+    const transcript = state.lastFinal.trim()
     if (transcript) {
       setStatus({ status: 'pasting', text: transcript })
       try {
@@ -226,28 +219,25 @@ async function finalizeSession(myGen: number): Promise<void> {
 
   // Paste / display is done — release the busy lock so the next hotkey press
   // can start a new session even while we're still holding the result on-screen.
-  if (myGen === sessionGeneration) {
-    busy = false
-    client = null
+  if (myGen === state.sessionGen) {
+    state.setBusy(false)
+    state.setClient(null)
   }
 
   // Visual hold: errors get a longer hold so the user can react before the
   // indicator hides (the notification persists separately).
-  const holdMs = currentStatus === 'error' ? ERROR_HIDE_DELAY_MS : HIDE_DELAY_MS
+  const holdMs = state.status === 'error' ? ERROR_HIDE_DELAY_MS : HIDE_DELAY_MS
   await sleep(holdMs)
-  if (
-    myGen === sessionGeneration &&
-    (currentStatus === 'done' || currentStatus === 'error')
-  ) {
+  if (myGen === state.sessionGen && (state.status === 'done' || state.status === 'error')) {
     setStatus({ status: 'idle' })
   }
 }
 
 async function applyHotkey(accelerator: string): Promise<boolean> {
   unregisterAll()
-  if (hotkeyPaused) {
+  if (state.hotkeyPaused) {
     // Defer actual registration; remember the desired accelerator so resume() picks it up.
-    activeHotkey = accelerator
+    state.setHotkeyAccel(accelerator)
     log(LogCategory.Hotkey, `deferred while paused (will register on resume): ${accelerator}`)
     return true
   }
@@ -255,7 +245,7 @@ async function applyHotkey(accelerator: string): Promise<boolean> {
     void onHotkey()
   })
   if (ok) {
-    activeHotkey = accelerator
+    state.setHotkeyAccel(accelerator)
     log(LogCategory.Hotkey, `registered: ${accelerator}`)
   } else {
     logError(LogCategory.Hotkey, `register FAILED: ${accelerator}`)
@@ -265,10 +255,10 @@ async function applyHotkey(accelerator: string): Promise<boolean> {
 
 /** Force-resume the global hotkey. Safe no-op if not paused. */
 async function forceResumeHotkey(): Promise<void> {
-  if (!hotkeyPaused) return
+  if (!state.hotkeyPaused) return
   log(LogCategory.Hotkey, 'force-resume (settings closed while paused)')
-  hotkeyPaused = false
-  if (activeHotkey) await applyHotkey(activeHotkey)
+  state.setHotkeyPaused(false)
+  if (state.hotkeyAccel) await applyHotkey(state.hotkeyAccel)
 }
 
 function showSettings(): void {
@@ -292,7 +282,7 @@ async function bootstrap(): Promise<void> {
 
   miniWindow.webContents.on('did-finish-load', () => {
     miniWindow?.webContents.send(IPC.StatusUpdate, {
-      status: currentStatus
+      status: state.status
     } satisfies StatusPayload)
   })
 
@@ -306,27 +296,27 @@ async function bootstrap(): Promise<void> {
 
   ipcMain.on(IPC.RequestQuit, () => app.quit())
   ipcMain.on(IPC.RecordingChunk, (_e, payload: RecordingChunkPayload) => {
-    client?.sendChunk(payload.pcm)
+    state.client?.sendChunk(payload.pcm)
   })
   ipcMain.on(IPC.RecordingError, (_e, payload: RecordingErrorPayload) => {
     setStatus({ status: 'error', error: payload.message })
-    client?.close()
+    state.client?.close()
     void sleep(TRANSIENT_ERROR_HIDE_MS).then(() => {
       setStatus({ status: 'idle' })
-      busy = false
-      client = null
+      state.setBusy(false)
+      state.setClient(null)
     })
   })
 
   ipcMain.handle(IPC.HotkeyPause, () => {
     log(LogCategory.Hotkey, 'pause requested')
-    hotkeyPaused = true
+    state.setHotkeyPaused(true)
     unregisterAll()
   })
   ipcMain.handle(IPC.HotkeyResume, async () => {
     log(LogCategory.Hotkey, 'resume requested')
-    hotkeyPaused = false
-    if (activeHotkey) await applyHotkey(activeHotkey)
+    state.setHotkeyPaused(false)
+    if (state.hotkeyAccel) await applyHotkey(state.hotkeyAccel)
   })
 
   ipcMain.handle(IPC.SettingsGet, async () => getAppSettings())
@@ -344,7 +334,7 @@ async function bootstrap(): Promise<void> {
         }`.trim() || 'save: (no changes)'
       )
       try {
-        const previousHotkey = activeHotkey
+        const previousHotkey = state.hotkeyAccel
         const settings = await updateSettings(update)
         if (settings.hotkey !== previousHotkey) {
           const ok = await applyHotkey(settings.hotkey)
@@ -389,8 +379,8 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   unregisterAll()
-  client?.close()
-  client = null
+  state.client?.close()
+  state.setClient(null)
   tray?.destroy()
   tray = null
 })
