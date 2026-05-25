@@ -50,8 +50,15 @@ export function setStatus(payload: StatusPayload): void {
       miniWindow.showInactive() // show without stealing focus
     }
   }
-  // Transcript window follows the same visibility rule as the indicator:
-  // visible during an active session, hidden when we're idle.
+  // Transcript window hides as soon as the result has been pasted (done) or
+  // we're showing an error — by then the user can see the text in the
+  // target app (or the error in the OS notification), so the panel just gets
+  // in the way. The indicator keeps its visual hold (HIDE_DELAY_MS) so the
+  // user still gets a clear "完了" confirmation in the corner.
+  if (payload.status === 'done' || payload.status === 'error') {
+    hideTranscript()
+  }
+  // Final reset on idle — also clear the text so a new session starts clean.
   if (payload.status === 'idle') {
     setTranscript('')
     hideTranscript()
