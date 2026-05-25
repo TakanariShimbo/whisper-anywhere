@@ -1,6 +1,6 @@
 {
   "name": "whisper-anywhere",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "ホットキーで音声を入力し、リアルタイム文字起こしを今フォーカス中のアプリへ自動貼り付けするデスクトップアプリ。",
   "author": {

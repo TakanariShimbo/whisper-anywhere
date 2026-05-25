@@ -24,17 +24,16 @@ linux:
   category: AudioVideo
   maintainer: takanari.shimbo@gmail.com
   synopsis: ホットキーで音声を入力し、リアルタイム文字起こしを今フォーカス中のアプリへ自動貼り付け。
-  description: |
-    ホットキーひとつで録音 → OpenAI Realtime API でリアルタイム文字起こし →
-    結果を今フォーカス中のアプリの入力欄へ自動貼り付けします。
-    メール、チャット、ブラウザ、エディタなど、どこからでも声で入力できます。
+  # IMPORTANT: keep this on a SINGLE line. electron-builder copies this value
+  # verbatim into the generated .desktop file's Comment field, and any newline
+  # makes desktop-file-utils refuse to parse the file (so the app disappears
+  # from GNOME Activities / Ubuntu app search).
+  description: ホットキーひとつで録音 → OpenAI Realtime API でリアルタイム文字起こし → 結果を今フォーカス中のアプリの入力欄へ自動貼り付け。メール、チャット、ブラウザ、エディタなど、どこからでも声で入力できます。
   desktop:
     entry:
       StartupWMClass: WhisperAnywhere
-      # The deb's long `description` field is multi-line, which is invalid in
-      # a .desktop file's Comment value. Override with a single line here so
-      # GNOME / desktop-file-utils can parse the file. Localised variant for
-      # ja_* locales.
+      # Override Comment so GNOME shows a short ASCII default that any locale
+      # can read, with a Japanese localisation for ja_* locales.
       Comment: Voice input for any app via a global hotkey.
       Comment[ja]: ホットキーで音声入力 → リアルタイム文字起こし → フォーカス中のアプリへ自動貼り付け。
 
