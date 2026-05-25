@@ -33,12 +33,15 @@ async function bootstrap(): Promise<void> {
   log(LogCategory.Lifecycle, 'bootstrap')
 
   // Auto-grant microphone permissions to our own renderer.
+  // Newer Chromium (Electron 32+) runs a synchronous permission CHECK before
+  // dispatching the (async) permission REQUEST, so both handlers must allow
+  // 'media' or getUserMedia rejects with AbortError before our request
+  // handler even fires.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
-    if (permission === 'media' || permission === 'mediaKeySystem') {
-      callback(true)
-    } else {
-      callback(false)
-    }
+    callback(permission === 'media' || permission === 'mediaKeySystem')
+  })
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+    return permission === 'media' || permission === 'mediaKeySystem'
   })
 
   // Create overlay windows up-front so they're warm by the time the user

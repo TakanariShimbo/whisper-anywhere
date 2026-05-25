@@ -1,6 +1,12 @@
 import { AUDIO_SAMPLE_RATE } from '@shared/audio'
 
-const WORKLET_URL = '/audio-worklets/pcm-processor.js'
+// In dev, document.baseURI is the Vite server (e.g. http://localhost:5173/).
+// In packaged builds, it's a file:// URL inside the asar (e.g.
+// file:///opt/WhisperAnywhere/resources/app.asar/out/renderer/index.html).
+// Resolving the worklet path against baseURI gives a URL that loads in both.
+// A bare '/audio-worklets/...' worked in dev but resolved to the filesystem
+// root in packaged builds and made addModule() reject with AbortError.
+const WORKLET_URL = new URL('audio-worklets/pcm-processor.js', document.baseURI).href
 
 export type ChunkCallback = (pcm: ArrayBuffer) => void
 
