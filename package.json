@@ -1,6 +1,6 @@
 {
   "name": "whisper-anywhere",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Voice input from anywhere — global hotkey, realtime transcription, paste to any app.",
   "author": {
