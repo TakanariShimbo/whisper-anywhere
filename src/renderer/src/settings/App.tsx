@@ -9,20 +9,24 @@ export function App(): JSX.Element {
   const [hotkey, setHotkey] = useState('')
   const [hasApiKey, setHasApiKey] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [autoStart, setAutoStart] = useState(false)
+  const [autoStartSupported, setAutoStartSupported] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
     void window.whisper.getSettings().then((s) => {
-      setHotkey(s.hotkey)
-      setHasApiKey(s.hasApiKey)
+      applySettings(s)
       setLoading(false)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function applySettings(s: AppSettings): void {
     setHotkey(s.hotkey)
     setHasApiKey(s.hasApiKey)
+    setAutoStart(s.autoStart)
+    setAutoStartSupported(s.autoStartSupported)
   }
 
   async function onSave(): Promise<void> {
@@ -54,6 +58,19 @@ export function App(): JSX.Element {
     }
   }
 
+  // Save autoStart on toggle (no separate "保存" needed for a single boolean).
+  async function onToggleAutoStart(next: boolean): Promise<void> {
+    setAutoStart(next) // optimistic
+    setMessage(null)
+    const res = await window.whisper.saveSettings({ autoStart: next })
+    if (res.ok) {
+      applySettings(res.settings)
+    } else {
+      applySettings(res.settings) // revert
+      setMessage({ kind: 'err', text: res.error ?? '自動起動の設定に失敗しました' })
+    }
+  }
+
   if (loading) {
     return <div style={{ padding: 24 }}>読み込み中…</div>
   }
@@ -62,7 +79,10 @@ export function App(): JSX.Element {
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
       <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>WhisperAnywhere 設定</h1>
 
-      <Field label="OpenAI API キー" help={hasApiKey ? '設定済み（空欄のまま保存すれば変更なし）' : '未設定'}>
+      <Field
+        label="OpenAI API キー"
+        help={hasApiKey ? '設定済み（空欄のまま保存すれば変更なし）' : '未設定'}
+      >
         <input
           type="password"
           autoComplete="off"
@@ -93,6 +113,20 @@ export function App(): JSX.Element {
           </span>
         )}
       </div>
+
+      <hr style={{ border: 0, borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
+
+      <CheckboxField
+        label="ログイン時に起動"
+        help={
+          autoStartSupported
+            ? 'OS にサインインしたとき自動で WhisperAnywhere を立ち上げます'
+            : '開発モードでは無効（インストール版でのみ動作）'
+        }
+        checked={autoStart}
+        disabled={!autoStartSupported}
+        onChange={onToggleAutoStart}
+      />
     </div>
   )
 }
@@ -111,6 +145,45 @@ function Field({
       <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{children}</div>
       {help && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{help}</span>}
+    </label>
+  )
+}
+
+function CheckboxField({
+  label,
+  help,
+  checked,
+  disabled,
+  onChange
+}: {
+  label: string
+  help?: string
+  checked: boolean
+  disabled?: boolean
+  onChange: (next: boolean) => void
+}): JSX.Element {
+  return (
+    <label
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        {label}
+      </span>
+      {help && (
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingLeft: 24 }}>{help}</span>
+      )}
     </label>
   )
 }

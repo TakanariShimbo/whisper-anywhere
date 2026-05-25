@@ -29,7 +29,7 @@ export const TRANSCRIPT_HEIGHT = 160
 
 /** Settings window default dimensions (pixels). */
 export const SETTINGS_WIDTH = 520
-export const SETTINGS_HEIGHT = 420
+export const SETTINGS_HEIGHT = 500
 
 /** Margin from the screen edge for overlay windows (pixels). */
 export const OVERLAY_MARGIN = 24

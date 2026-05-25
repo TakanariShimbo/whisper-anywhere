@@ -63,8 +63,14 @@ export async function getHotkey(): Promise<string> {
   return data.hotkey?.trim() || DEFAULT_HOTKEY
 }
 
-/** Returns AppSettings safe to send over IPC (no plaintext API key). */
-export async function getAppSettings(): Promise<AppSettings> {
+/**
+ * Returns just the persistence-managed slice of AppSettings (hotkey +
+ * hasApiKey). OS-level flags like autoStart live in services/autoStart.ts
+ * and are merged in by the IPC layer.
+ */
+export type PersistedSettings = Pick<AppSettings, 'hotkey' | 'hasApiKey'>
+
+export async function getAppSettings(): Promise<PersistedSettings> {
   const data = await loadFromDisk()
   const hasFromFile = Boolean(data.apiKeyEnc || data.apiKey)
   const hasFromEnv = Boolean(process.env.OPENAI_API_KEY?.trim())
@@ -74,8 +80,8 @@ export async function getAppSettings(): Promise<AppSettings> {
   }
 }
 
-/** Applies a partial update. Returns the new resolved settings. */
-export async function updateSettings(update: SettingsUpdate): Promise<AppSettings> {
+/** Applies a partial update. Returns the new persisted settings. */
+export async function updateSettings(update: SettingsUpdate): Promise<PersistedSettings> {
   const data = { ...(await loadFromDisk()) }
 
   if (update.hotkey !== undefined) {

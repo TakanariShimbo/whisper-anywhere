@@ -13,8 +13,14 @@ import {
   pauseHotkey,
   resumeHotkey
 } from './session'
+import { applyAutoStart, getAutoStartStatus } from './services/autoStart'
 import { getAppSettings, updateSettings } from './settings'
 import { state } from './state/appState'
+
+async function getCombinedSettings() {
+  const [base, auto] = await Promise.all([getAppSettings(), getAutoStartStatus()])
+  return { ...base, autoStart: auto.enabled, autoStartSupported: auto.supported }
+}
 
 /**
  * One-stop registration of every IPC handler. Called once at bootstrap.
@@ -37,7 +43,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.HotkeyPause, () => pauseHotkey())
   ipcMain.handle(IPC.HotkeyResume, () => resumeHotkey())
 
-  ipcMain.handle(IPC.SettingsGet, () => getAppSettings())
+  ipcMain.handle(IPC.SettingsGet, () => getCombinedSettings())
   ipcMain.handle(
     IPC.SettingsSave,
     async (_e, update: SettingsUpdate): Promise<SettingsSaveResult> => {
@@ -49,11 +55,13 @@ export function registerIpcHandlers(): void {
             : update.apiKey !== undefined
               ? 'apiKey=*** '
               : ''
-        }`.trim() || 'save: (no changes)'
+        }${update.autoStart !== undefined ? `autoStart=${update.autoStart} ` : ''}`.trim() ||
+          'save: (no changes)'
       )
       try {
         const previousHotkey = state.hotkeyAccel
-        const settings = await updateSettings(update)
+        await updateSettings(update)
+        const settings = await getCombinedSettings()
         if (settings.hotkey !== previousHotkey) {
           const ok = await applyHotkey(settings.hotkey)
           if (!ok) {
@@ -62,15 +70,18 @@ export function registerIpcHandlers(): void {
             return {
               ok: false,
               error: `ホットキー登録失敗: ${settings.hotkey}`,
-              settings: await getAppSettings()
+              settings: await getCombinedSettings()
             }
           }
         }
-        return { ok: true, settings }
+        if (update.autoStart !== undefined) {
+          await applyAutoStart(update.autoStart)
+        }
+        return { ok: true, settings: await getCombinedSettings() }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         logError(LogCategory.Settings, `save failed: ${message}`)
-        return { ok: false, error: message, settings: await getAppSettings() }
+        return { ok: false, error: message, settings: await getCombinedSettings() }
       }
     }
   )
