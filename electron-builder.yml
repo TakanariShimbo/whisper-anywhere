@@ -23,10 +23,11 @@ linux:
     - deb
   category: AudioVideo
   maintainer: takanari.shimbo@gmail.com
-  synopsis: Voice input from any app via a global hotkey.
+  synopsis: ホットキーで音声を入力し、リアルタイム文字起こしを今フォーカス中のアプリへ自動貼り付け。
   description: |
-    WhisperAnywhere lets you press a global hotkey, speak, and have
-    the transcription auto-pasted into whichever app has focus.
+    ホットキーひとつで録音 → OpenAI Realtime API でリアルタイム文字起こし →
+    結果を今フォーカス中のアプリの入力欄へ自動貼り付けします。
+    メール、チャット、ブラウザ、エディタなど、どこからでも声で入力できます。
   desktop:
     entry:
       StartupWMClass: WhisperAnywhere
